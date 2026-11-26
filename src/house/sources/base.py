@@ -85,6 +85,30 @@ def detect_num_units(
     return 1
 
 
+_DESC_BATHS_RE = re.compile(
+    r"\b(\d+(?:\.\d+)?)\s*(?:full\s+)?(?:bath|baths|bathroom|bathrooms|ba)\b",
+    re.IGNORECASE,
+)
+
+
+def sanitize_baths(baths: float | None, description: str = "") -> float:
+    """
+    Ensure every residential listing has a realistic bathroom count (>= 1.0).
+    If the feed omits baths (0 / None), try extracting from description, else default to 1.0.
+    """
+    if baths is not None and baths >= 1.0:
+        return float(baths)
+    m = _DESC_BATHS_RE.search(description or "")
+    if m:
+        try:
+            parsed = float(m.group(1))
+            if 1.0 <= parsed <= 12.0:
+                return parsed
+        except ValueError:
+            pass
+    return 1.0
+
+
 _AMENITY_KEYWORDS = {
     "laundry_in_unit": ("in-unit laundry", "in unit laundry", "washer/dryer", "washer dryer", "laundry in unit", "w/d"),
     "laundry_in_building": ("laundry in building", "laundry room", "common laundry"),

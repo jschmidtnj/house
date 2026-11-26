@@ -15,6 +15,7 @@ from house.sources.base import (
     normalize_property_type,
     parse_currency,
     parse_int,
+    sanitize_baths,
 )
 
 logger = logging.getLogger(__name__)
@@ -114,12 +115,16 @@ def parse_homeharvest_row(row: dict[str, Any]) -> ListingData | None:
     else:
         monthly_hoa = hoa_fee
         monthly_tax = _extract_monthly_tax(row)
+        # Guard against whole-building tax bills accidentally attached to a single condo unit (> 4.2%/yr)
+        if ptype == "condo" and monthly_tax is not None and price > 0 and (monthly_tax * 12.0) / price > 0.042:
+            monthly_tax = None
 
     full_baths = parse_currency(_clean_val(row.get("full_baths"))) or 0.0
     half_baths = parse_currency(_clean_val(row.get("half_baths"))) or 0.0
     baths = full_baths + (0.5 * half_baths)
     if baths <= 0:
         baths = parse_currency(_clean_val(row.get("baths"))) or 0.0
+    baths = sanitize_baths(baths, description)
 
     beds = parse_currency(_clean_val(row.get("beds"))) or 0.0
     sqft = parse_int(_clean_val(row.get("sqft")))

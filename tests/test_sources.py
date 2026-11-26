@@ -172,3 +172,44 @@ def test_homeharvest_row_parser_condo_and_coop():
     assert coop.monthly_maintenance == 2180.0
     assert coop.monthly_hoa is None
     assert coop.monthly_tax is None
+
+
+def test_homeharvest_baths_and_tax_fallbacks():
+    row_missing_baths = {
+        "property_id": "hh-bath-0",
+        "street": "180 Park Row",
+        "unit": "24A",
+        "city": "New York",
+        "county": "New York",
+        "zip_code": "10038",
+        "style": "CONDOS",
+        "list_price": 975000,
+        "beds": 1,
+        "full_baths": 0,
+        "half_baths": 0,
+        "hoa_fee": 2334,
+        "text": "Spacious Chatham Towers co-op with balcony.",
+    }
+    parsed = parse_homeharvest_row(row_missing_baths)
+    assert parsed is not None
+    assert parsed.baths == 1.0
+
+    row_whole_building_tax = {
+        "property_id": "hh-tax-bad",
+        "street": "215 Calyer St",
+        "unit": "3B",
+        "city": "Brooklyn",
+        "county": "Kings",
+        "zip_code": "11222",
+        "style": "CONDOS",
+        "list_price": 1_000_000,
+        "beds": 2,
+        "full_baths": None,
+        "hoa_fee": 750,
+        "tax": 60_000,  # 6%/yr -> whole building tax error
+        "text": "Bright condo with 2 bathrooms and roof deck.",
+    }
+    parsed2 = parse_homeharvest_row(row_whole_building_tax)
+    assert parsed2 is not None
+    assert parsed2.baths == 2.0
+    assert parsed2.monthly_tax is None

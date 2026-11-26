@@ -8,10 +8,12 @@ sources:
   homeharvest:
     enabled: true
     locations:
-      # Manhattan: LES/Chinatown, EV, FiDi, Gramercy, Chelsea, SoHo/Nolita, Tribeca, West Village, Kips Bay/Murray Hill, Midtown East
+      # Manhattan: LES/Chinatown, EV, FiDi, Gramercy, Chelsea, Hudson Yards/Hell's Kitchen, SoHo/Nolita, Tribeca, West Village, Kips Bay/Murray Hill, Midtown East
+      - "10001"
       - "10002"
       - "10003"
       - "10005"
+      - "10007"
       - "10009"
       - "10010"
       - "10011"
@@ -20,7 +22,10 @@ sources:
       - "10014"
       - "10016"
       - "10017"
+      - "10018"
+      - "10019"
       - "10022"
+      - "10036"
       - "10038"
       # Brooklyn: DUMBO/BK Heights/Downtown BK, Fort Greene/Navy Yard/Clinton Hill, Bushwick, Williamsburg, Bed-Stuy, Boerum Hill, Greenpoint, Carroll Gardens/Red Hook
       - "11201"

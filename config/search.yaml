@@ -12,12 +12,17 @@ neighborhoods:
   - Lower East Side
   - Chinatown
   - Two Bridges
+  - Civic Center
   - Financial District
   - FiDi
   - Battery Park City
   - West Village
   - Greenwich Village
   - Chelsea
+  - Hudson Yards
+  - Hell's Kitchen
+  - Clinton
+  - Midtown West
   - Tribeca
   - SoHo
   - NoHo
@@ -73,6 +78,7 @@ zip_codes:
   - "07307"
   - "07310"
   - "07311"
+  - "10001"
   - "10002"
   - "10003"
   - "10004"
@@ -87,7 +93,10 @@ zip_codes:
   - "10014"
   - "10016"
   - "10017"
+  - "10018"
+  - "10019"
   - "10022"
+  - "10036"
   - "10038"
   - "10280"
   - "10282"
