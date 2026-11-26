@@ -8,16 +8,47 @@ sources:
   homeharvest:
     enabled: true
     locations:
-      - Manhattan, NY
-      - Brooklyn, NY
-      - Long Island City, NY
-      - Astoria, NY
-      - Jersey City, NJ
-      - Hoboken, NJ
-    past_days: 14
-    limit: 150
+      # Manhattan: LES/Chinatown, EV, FiDi, Gramercy, Chelsea, SoHo/Nolita, Tribeca, West Village, Kips Bay/Murray Hill, Midtown East
+      - "10002"
+      - "10003"
+      - "10005"
+      - "10009"
+      - "10010"
+      - "10011"
+      - "10012"
+      - "10013"
+      - "10014"
+      - "10016"
+      - "10017"
+      - "10022"
+      - "10038"
+      # Brooklyn: DUMBO/BK Heights/Downtown BK, Fort Greene/Navy Yard/Clinton Hill, Bushwick, Williamsburg, Bed-Stuy, Boerum Hill, Greenpoint, Carroll Gardens/Red Hook
+      - "11201"
+      - "11205"
+      - "11206"
+      - "11211"
+      - "11216"
+      - "11217"
+      - "11221"
+      - "11222"
+      - "11231"
+      - "11237"
+      - "11238"
+      - "11249"
+      # Queens: Long Island City & Astoria
+      - "11101"
+      - "11102"
+      - "11103"
+      - "11106"
+      # NJ (PATH-accessible): Hoboken, Downtown Jersey City, Newport, Journal Square
+      - "07030"
+      - "07302"
+      - "07306"
+      - "07310"
+    past_days: 45
+    limit: 60
     extra_property_data: true
-    include_multifamily_pass: true
+    include_multifamily_pass: false
 
   # Local JSON/CSV exports dropped into data/imports/ (100% free, zero anti-bot issues)
   local_import:

@@ -231,3 +231,6 @@ data/imports/*.csv
 data/imports/*.yaml
 web/node_modules/
 web/dist/
+
+# Mac stuff
+.DS_Store

@@ -23,6 +23,10 @@ from house.scoring import rank_listings
 from house.sources import poll_all_sources
 
 
+class CreateListRequest(BaseModel):
+    name: str
+
+
 class RankRequest(BaseModel):
     """Live knob overrides from the Web UI."""
 
@@ -237,12 +241,9 @@ def create_app(config_path: str | Path = "config/default.yaml") -> FastAPI:
             history = db.get_price_history(listing_id)
 
         item = Database.to_listing_data(row)
-        costs = calculate_cost_breakdown(item, cfg.budget)
+        scored = rank_listings([row], cfg.budget, cfg.search, include_rejected=True)[0]
         return {
-            "id": row.id,
-            "sources": json.loads(row.sources_json or "[]"),
-            "listing": asdict(item),
-            "costs": asdict(costs),
+            **_serialize_scored(scored),
             "price_history": [
                 {
                     "recorded_at": h.recorded_at,
@@ -256,6 +257,89 @@ def create_app(config_path: str | Path = "config/default.yaml") -> FastAPI:
                 for h in history
             ],
         }
+
+    @app.get("/api/saved")
+    def get_saved() -> dict[str, Any]:
+        cfg = load_config(cfg_path)
+        with Database(cfg.database_path) as db:
+            raw = db.get_bot_state("saved_listing_ids")
+        ids = sorted({int(x) for x in json.loads(raw or "[]") if str(x).isdigit()})
+        return {"saved_ids": ids}
+
+    @app.post("/api/saved/{listing_id}")
+    def toggle_saved(listing_id: int) -> dict[str, Any]:
+        cfg = load_config(cfg_path)
+        with Database(cfg.database_path) as db:
+            raw = db.get_bot_state("saved_listing_ids")
+            ids = {int(x) for x in json.loads(raw or "[]") if str(x).isdigit()}
+            if listing_id in ids:
+                ids.remove(listing_id)
+                saved = False
+            else:
+                ids.add(listing_id)
+                saved = True
+            sorted_ids = sorted(ids)
+            db.set_bot_state("saved_listing_ids", json.dumps(sorted_ids))
+        return {"listing_id": listing_id, "saved": saved, "saved_ids": sorted_ids}
+
+    def _load_custom_lists(db: Database) -> dict[str, list[int]]:
+        raw = db.get_bot_state("custom_lists")
+        data = json.loads(raw or "{}")
+        if not isinstance(data, dict):
+            return {}
+        out: dict[str, list[int]] = {}
+        for k, v in data.items():
+            name = str(k).strip()
+            if name and isinstance(v, list):
+                out[name] = sorted({int(x) for x in v if str(x).isdigit()})
+        return out
+
+    @app.get("/api/lists")
+    def get_lists() -> dict[str, Any]:
+        cfg = load_config(cfg_path)
+        with Database(cfg.database_path) as db:
+            lists = _load_custom_lists(db)
+        return {"lists": lists}
+
+    @app.post("/api/lists")
+    def create_list(req: CreateListRequest) -> dict[str, Any]:
+        name = req.name.strip()[:48]
+        if not name:
+            raise HTTPException(status_code=400, detail="List name cannot be empty")
+        cfg = load_config(cfg_path)
+        with Database(cfg.database_path) as db:
+            lists = _load_custom_lists(db)
+            lists.setdefault(name, [])
+            db.set_bot_state("custom_lists", json.dumps(lists))
+        return {"name": name, "lists": lists}
+
+    @app.delete("/api/lists/{list_name}")
+    def delete_list(list_name: str) -> dict[str, Any]:
+        cfg = load_config(cfg_path)
+        with Database(cfg.database_path) as db:
+            lists = _load_custom_lists(db)
+            lists.pop(list_name, None)
+            db.set_bot_state("custom_lists", json.dumps(lists))
+        return {"lists": lists}
+
+    @app.post("/api/lists/{list_name}/toggle/{listing_id}")
+    def toggle_list_item(list_name: str, listing_id: int) -> dict[str, Any]:
+        name = list_name.strip()[:48]
+        if not name:
+            raise HTTPException(status_code=400, detail="Invalid list name")
+        cfg = load_config(cfg_path)
+        with Database(cfg.database_path) as db:
+            lists = _load_custom_lists(db)
+            cur = set(lists.get(name, []))
+            if listing_id in cur:
+                cur.remove(listing_id)
+                in_list = False
+            else:
+                cur.add(listing_id)
+                in_list = True
+            lists[name] = sorted(cur)
+            db.set_bot_state("custom_lists", json.dumps(lists))
+        return {"name": name, "listing_id": listing_id, "in_list": in_list, "lists": lists}
 
     @app.post("/api/poll")
     def post_poll(synthetic: bool = False) -> dict[str, Any]:

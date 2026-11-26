@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, ExternalLink, Maximize2, Minimize2, Scale, X } from "lucide-react";
+import { AlertTriangle, Check, ExternalLink, FolderPlus, Heart, Link2, Maximize2, Minimize2, Plus, Scale, X } from "lucide-react";
 import type { ScoredListing } from "../types";
 
 interface ListingDrawerProps {
@@ -7,11 +7,28 @@ interface ListingDrawerProps {
   onClose: () => void;
   isPinned: boolean;
   onTogglePin: (id: number) => void;
+  isSaved: boolean;
+  onToggleSave: (id: number) => void;
+  customLists: Record<string, number[]>;
+  onToggleInList: (listName: string, id: number) => void;
+  onCreateList: (listName: string, initialId?: number) => void;
 }
 
-export function ListingDrawer({ item, onClose, isPinned, onTogglePin }: ListingDrawerProps) {
+export function ListingDrawer({
+  item,
+  onClose,
+  isPinned,
+  onTogglePin,
+  isSaved,
+  onToggleSave,
+  customLists,
+  onToggleInList,
+  onCreateList,
+}: ListingDrawerProps) {
   const [width, setWidth] = useState<number>(460);
   const [dragging, setDragging] = useState<boolean>(false);
+  const [copied, setCopied] = useState<boolean>(false);
+  const [newListName, setNewListName] = useState<string>("");
 
   useEffect(() => {
     if (!dragging) return;
@@ -45,7 +62,7 @@ export function ListingDrawer({ item, onClose, isPinned, onTogglePin }: ListingD
 
   return (
     <div
-      style={{ width: `${width}px`, maxWidth: "95vw" }}
+      style={{ width: typeof window !== "undefined" && window.innerWidth < 640 ? "100vw" : `${width}px`, maxWidth: "100vw" }}
       className="fixed inset-y-0 right-0 z-[1000] flex flex-col border-l border-zinc-800 bg-zinc-950 shadow-2xl"
     >
       {/* Left-edge drag handle */}
@@ -64,20 +81,48 @@ export function ListingDrawer({ item, onClose, isPinned, onTogglePin }: ListingD
           </h2>
           <p className="text-xs text-zinc-400">
             {l.neighborhood || l.borough} {l.zip_code ? `• ${l.zip_code}` : ""} •{" "}
-            <span className="uppercase">{l.property_type}</span>
+            <span className="uppercase">{l.property_type}</span> •{" "}
+            <span className="font-medium text-zinc-200">
+              {l.beds} bd / {l.baths} ba{l.sqft ? ` • ${l.sqft.toLocaleString()} sqft` : ""}
+            </span>
           </p>
         </div>
         <div className="flex items-center gap-1.5">
           <button
-            onClick={() => setWidth(isExpanded ? 460 : Math.min(760, Math.round(window.innerWidth * 0.65)))}
+            onClick={() => onToggleSave(item.id)}
+            className={`flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-medium transition ${
+              isSaved
+                ? "border-rose-500/50 bg-rose-500/15 text-rose-300"
+                : "border-zinc-800 text-zinc-300 hover:border-zinc-700"
+            }`}
+            title={isSaved ? "Remove from favorites" : "Favorite listing"}
+          >
+            <Heart className={`h-3.5 w-3.5 ${isSaved ? "fill-rose-400 text-rose-400" : ""}`} />
+            {isSaved ? "Favorited" : "Favorite"}
+          </button>
+          <button
+            onClick={() => {
+              const url = new URL(window.location.href);
+              url.searchParams.set("listing", String(item.id));
+              navigator.clipboard?.writeText(url.toString()).catch(() => {});
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1500);
+            }}
             className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+            title="Copy direct link"
+          >
+            {copied ? <Check className="h-4 w-4 text-teal-400" /> : <Link2 className="h-4 w-4" />}
+          </button>
+          <button
+            onClick={() => setWidth(isExpanded ? 460 : Math.min(760, Math.round(window.innerWidth * 0.65)))}
+            className="hidden rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 sm:inline-flex"
             title={isExpanded ? "Compact width" : "Expand panel"}
           >
             {isExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
           </button>
           <button
             onClick={() => onTogglePin(item.id)}
-            className={`flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-medium ${
+            className={`hidden items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-medium sm:flex ${
               isPinned
                 ? "border-blue-500/50 bg-blue-500/15 text-blue-300"
                 : "border-zinc-800 text-zinc-300 hover:border-zinc-700"
@@ -105,7 +150,7 @@ export function ListingDrawer({ item, onClose, isPinned, onTogglePin }: ListingD
         )}
 
         {/* Headline Stats */}
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <div className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-2.5">
             <div className="text-[11px] text-zinc-400">
               {c.rentable_units > 0 ? "Net Out-of-Pocket" : "All-In Monthly"}
@@ -129,11 +174,73 @@ export function ListingDrawer({ item, onClose, isPinned, onTogglePin }: ListingD
             </div>
           </div>
           <div className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-2.5">
+            <div className="text-[11px] text-zinc-400">Layout</div>
+            <div className="text-base font-semibold text-zinc-50">
+              {l.beds}bd / {l.baths}ba
+            </div>
+            <div className="text-[10px] text-zinc-500">
+              {l.sqft ? `${l.sqft.toLocaleString()} sqft` : "Sqft N/A"}
+            </div>
+          </div>
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-2.5">
             <div className="text-[11px] text-zinc-400">Score / DTI</div>
             <div className="text-base font-semibold text-blue-400">{item.score.toFixed(1)}</div>
             <div className="text-[10px] text-zinc-500">
               {c.dti_pct != null ? `${c.dti_pct}% gross DTI` : "DTI N/A"}
             </div>
+          </div>
+        </div>
+
+        {/* Custom Lists Membership */}
+        <div className="space-y-2 rounded-xl border border-zinc-800 bg-zinc-900/50 p-3">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-zinc-300">
+            <FolderPlus className="h-3.5 w-3.5 text-blue-400" />
+            <span>Lists</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {Object.entries(customLists).map(([name, ids]) => {
+              const inList = ids.includes(item.id);
+              return (
+                <button
+                  key={name}
+                  onClick={() => onToggleInList(name, item.id)}
+                  className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium transition ${
+                    inList
+                      ? "border-blue-500/60 bg-blue-500/15 text-blue-200"
+                      : "border-zinc-700 bg-zinc-900 text-zinc-400 hover:border-zinc-600 hover:text-zinc-200"
+                  }`}
+                >
+                  {inList ? <Check className="h-3 w-3 text-blue-400" /> : <Plus className="h-3 w-3" />}
+                  {name}
+                </button>
+              );
+            })}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const trimmed = newListName.trim();
+                if (!trimmed) return;
+                onCreateList(trimmed, item.id);
+                setNewListName("");
+              }}
+              className="flex items-center gap-1"
+            >
+              <input
+                type="text"
+                placeholder="New list..."
+                value={newListName}
+                onChange={(e) => setNewListName(e.target.value)}
+                className="w-28 rounded-full border border-zinc-800 bg-zinc-950 px-2.5 py-1 text-[11px] text-zinc-100 placeholder:text-zinc-500 focus:border-blue-500 focus:outline-none"
+              />
+              {newListName.trim() && (
+                <button
+                  type="submit"
+                  className="rounded-full bg-blue-500 px-2 py-1 text-[10px] font-semibold text-zinc-950 hover:bg-blue-400"
+                >
+                  Add
+                </button>
+              )}
+            </form>
           </div>
         </div>
 

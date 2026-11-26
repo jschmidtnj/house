@@ -1,4 +1,5 @@
-import { RotateCcw, Sliders } from "lucide-react";
+import { useState } from "react";
+import { Folder, Heart, Plus, RotateCcw, Sliders, Trash2, X } from "lucide-react";
 import type { KnobsState } from "../types";
 
 interface KnobSidebarProps {
@@ -6,11 +7,33 @@ interface KnobSidebarProps {
   onChange: (next: KnobsState) => void;
   onReset: () => void;
   width: number;
+  isMobile?: boolean;
+  onClose?: () => void;
+  savedCount: number;
+  customLists: Record<string, number[]>;
+  activeList: string | null; // null = All, "__favorites__" = Favorites, else custom list name
+  onSelectList: (name: string | null) => void;
+  onCreateList: (name: string) => void;
+  onDeleteList: (name: string) => void;
 }
 
 const ALL_TYPES = ["condo", "coop", "condop", "townhouse", "multifamily"];
 
-export function KnobSidebar({ knobs, onChange, onReset, width }: KnobSidebarProps) {
+export function KnobSidebar({
+  knobs,
+  onChange,
+  onReset,
+  width,
+  isMobile = false,
+  onClose,
+  savedCount,
+  customLists,
+  activeList,
+  onSelectList,
+  onCreateList,
+  onDeleteList,
+}: KnobSidebarProps) {
+  const [newListName, setNewListName] = useState("");
   const grossMonthlyIncome = knobs.annual_income > 0 ? knobs.annual_income / 12 : 0;
   const targetDti = grossMonthlyIncome > 0 ? (knobs.max_monthly_cost / grossMonthlyIncome) * 100 : 0;
 
@@ -28,22 +51,126 @@ export function KnobSidebar({ knobs, onChange, onReset, width }: KnobSidebarProp
 
   return (
     <aside
-      style={{ width: `${width}px` }}
-      className="flex h-full shrink-0 flex-col gap-4 overflow-y-auto border-r border-zinc-800/90 bg-zinc-950 p-4"
+      style={isMobile ? undefined : { width: `${width}px` }}
+      className={`flex h-full shrink-0 flex-col gap-4 overflow-y-auto border-r border-zinc-800/90 bg-zinc-950 p-4 ${
+        isMobile ? "w-[85vw] max-w-sm shadow-2xl" : ""
+      }`}
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-400">
           <Sliders className="h-3.5 w-3.5 text-blue-400" />
           <span>Budget &amp; Filters</span>
         </div>
-        <button
-          onClick={onReset}
-          className="flex items-center gap-1 rounded-md border border-zinc-800 px-2 py-1 text-[11px] text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"
-          title="Reset to config/budget.yaml defaults"
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={onReset}
+            className="flex items-center gap-1 rounded-md border border-zinc-800 px-2 py-1 text-[11px] text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"
+            title="Reset to config/budget.yaml defaults"
+          >
+            <RotateCcw className="h-3 w-3" />
+            Reset
+          </button>
+          {isMobile && onClose && (
+            <button
+              onClick={onClose}
+              className="rounded-md border border-zinc-800 p-1 text-zinc-400 hover:text-zinc-100"
+              aria-label="Close filters"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Lists & Collections */}
+      <div className="space-y-2 rounded-xl border border-zinc-800 bg-zinc-900/50 p-3">
+        <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+          <span>My Lists</span>
+        </div>
+        <div className="space-y-1 text-xs">
+          <button
+            onClick={() => onSelectList(null)}
+            className={`flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left transition ${
+              activeList === null
+                ? "bg-zinc-800 font-medium text-zinc-100"
+                : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
+            }`}
+          >
+            <span>All Matching</span>
+          </button>
+          <button
+            onClick={() => onSelectList(activeList === "__favorites__" ? null : "__favorites__")}
+            className={`flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left transition ${
+              activeList === "__favorites__"
+                ? "bg-rose-500/15 font-medium text-rose-200"
+                : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
+            }`}
+          >
+            <span className="flex items-center gap-1.5">
+              <Heart className={`h-3.5 w-3.5 ${activeList === "__favorites__" ? "fill-rose-400 text-rose-400" : ""}`} />
+              Favorites
+            </span>
+            <span className="text-[11px] text-zinc-500">{savedCount}</span>
+          </button>
+
+          {Object.entries(customLists).map(([name, ids]) => {
+            const active = activeList === name;
+            return (
+              <div
+                key={name}
+                className={`group flex items-center justify-between rounded-lg px-2 py-1.5 transition ${
+                  active
+                    ? "bg-blue-500/15 font-medium text-blue-200"
+                    : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
+                }`}
+              >
+                <button
+                  onClick={() => onSelectList(active ? null : name)}
+                  className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+                >
+                  <Folder className="h-3.5 w-3.5 shrink-0 text-blue-400" />
+                  <span className="truncate">{name}</span>
+                </button>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] text-zinc-500">{ids.length}</span>
+                  <button
+                    onClick={() => onDeleteList(name)}
+                    className="opacity-60 hover:text-rose-400 hover:opacity-100"
+                    title={`Delete "${name}"`}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const trimmed = newListName.trim();
+            if (!trimmed) return;
+            onCreateList(trimmed);
+            setNewListName("");
+          }}
+          className="flex items-center gap-1.5 pt-1"
         >
-          <RotateCcw className="h-3 w-3" />
-          Reset
-        </button>
+          <input
+            type="text"
+            placeholder="Create custom list..."
+            value={newListName}
+            onChange={(e) => setNewListName(e.target.value)}
+            className="min-w-0 flex-1 rounded-lg border border-zinc-800 bg-zinc-950 px-2.5 py-1 text-xs text-zinc-100 placeholder:text-zinc-500 focus:border-blue-500 focus:outline-none"
+          />
+          <button
+            type="submit"
+            className="flex items-center gap-0.5 rounded-lg border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs font-medium text-zinc-200 hover:bg-zinc-700"
+            title="Create list"
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+        </form>
       </div>
 
       {/* Primary Knob: Max Monthly Cost */}

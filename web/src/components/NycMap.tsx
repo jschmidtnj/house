@@ -383,7 +383,7 @@ export function NycMap({ listings, selectedId, onSelect }: NycMapProps) {
           : "";
 
       marker.bindTooltip(
-        `<div style="font-size:12px"><strong>${item.listing.address}${unitStr}</strong><br/>${hood} • $${Math.round(
+        `<div style="font-size:12px"><strong>${item.listing.address}${unitStr}</strong><br/>${hood} • ${item.listing.beds}bd/${item.listing.baths}ba • $${Math.round(
           shownMonthly
         ).toLocaleString()}/mo${dti}${commuteStr} • Score ${item.score}</div>`,
         { direction: "top", offset: [0, -10] }
@@ -448,7 +448,7 @@ export function NycMap({ listings, selectedId, onSelect }: NycMapProps) {
       </div>
 
       {/* Legend */}
-      <div className="pointer-events-none absolute bottom-3 left-3 z-[400] flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-950/90 px-3 py-1.5 text-[11px] text-zinc-400 backdrop-blur">
+      <div className="pointer-events-none absolute bottom-3 left-3 z-[400] hidden items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-950/90 px-3 py-1.5 text-[11px] text-zinc-400 backdrop-blur sm:flex">
         <span className="flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 rounded-full bg-teal-400" /> Top (≥65)
         </span>

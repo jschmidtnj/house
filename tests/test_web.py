@@ -40,3 +40,29 @@ def test_web_api_config_rank_and_detail(tmp_path: Path):
     r_detail = client.get(f"/api/listings/{first_id}")
     assert r_detail.status_code == 200
     assert r_detail.json()["costs"]["total_monthly_cost"] <= 8000
+
+
+    # Test save / unsave persistence
+    r_save = client.post(f"/api/saved/{first_id}")
+    assert r_save.status_code == 200
+    assert r_save.json()["saved"] is True
+    assert first_id in client.get("/api/saved").json()["saved_ids"]
+
+    r_unsave = client.post(f"/api/saved/{first_id}")
+    assert r_unsave.json()["saved"] is False
+    assert first_id not in client.get("/api/saved").json()["saved_ids"]
+
+
+    # Test custom lists CRUD + toggle membership
+    r_create = client.post("/api/lists", json={"name": "Tour Weekend"})
+    assert r_create.status_code == 200
+    assert "Tour Weekend" in r_create.json()["lists"]
+
+    r_add = client.post(f"/api/lists/Tour%20Weekend/toggle/{first_id}")
+    assert r_add.status_code == 200
+    assert r_add.json()["in_list"] is True
+    assert first_id in client.get("/api/lists").json()["lists"]["Tour Weekend"]
+
+    r_del = client.delete("/api/lists/Tour%20Weekend")
+    assert r_del.status_code == 200
+    assert "Tour Weekend" not in r_del.json()["lists"]
