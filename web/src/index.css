@@ -69,6 +69,38 @@ body,
   margin: 0;
 }
 
+/* Larger base typography, icons, touch targets & map pins on iPad / touch tablets */
+@media (pointer: coarse) and (min-width: 768px) {
+  html {
+    font-size: 19px;
+  }
+
+  .map-price-pin {
+    font-size: 13px;
+    padding: 6px 11px;
+  }
+
+  .map-cluster-pill {
+    font-size: 13px;
+    padding: 6px 12px;
+  }
+
+  .map-cluster-bubble {
+    font-size: 13px;
+    width: 36px;
+    height: 36px;
+  }
+
+  .map-cluster-count {
+    font-size: 12px;
+    padding: 1px 6px;
+  }
+
+  .hood-label {
+    font-size: 12px;
+  }
+}
+
 .leaflet-container {
   background: #09090b;
   font-family: inherit;
