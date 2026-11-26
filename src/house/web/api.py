@@ -403,6 +403,9 @@ def create_app(config_path: str | Path = "config/default.yaml") -> FastAPI:
             candidate = dist_dir / full_path
             if full_path and candidate.is_file():
                 return FileResponse(str(candidate))
-            return FileResponse(str(dist_dir / "index.html"))
+            return FileResponse(
+                str(dist_dir / "index.html"),
+                headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+            )
 
     return app

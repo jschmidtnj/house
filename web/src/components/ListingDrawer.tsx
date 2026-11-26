@@ -110,20 +110,45 @@ export function ListingDrawer({
         title="Drag edge to resize panel"
       />
 
-      <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
-        <div className="min-w-0">
-          <h2 className="truncate text-sm font-semibold text-zinc-100">
-            {l.address} {l.unit ? `#${l.unit}` : ""}
-          </h2>
-          <p className="text-xs text-zinc-400">
-            {l.neighborhood || l.borough} {l.zip_code ? `• ${l.zip_code}` : ""} •{" "}
-            <span className="uppercase">{l.property_type}</span> •{" "}
-            <span className="font-medium text-zinc-200">
-              {l.beds} bd / {l.baths} ba{l.sqft ? ` • ${l.sqft.toLocaleString()} sqft` : ""}
-            </span>
-          </p>
+      <div className="space-y-2.5 border-b border-zinc-800 px-4 py-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate text-sm font-semibold text-zinc-100">
+              {l.address} {l.unit ? `#${l.unit}` : ""}
+            </h2>
+            <p className="mt-0.5 text-xs text-zinc-400">
+              {l.neighborhood || l.borough} {l.zip_code ? `• ${l.zip_code}` : ""} •{" "}
+              <span className="uppercase">{l.property_type}</span> •{" "}
+              <span className="font-medium text-zinc-200">
+                {l.beds} bd / {l.baths} ba{l.sqft ? ` • ${l.sqft.toLocaleString()} sqft` : ""}
+              </span>
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              onClick={() =>
+                setWidth(
+                  isExpanded
+                    ? UI_CONFIG.drawer.defaultWidth
+                    : Math.min(UI_CONFIG.drawer.expandedTarget, Math.round(window.innerWidth * 0.65))
+                )
+              }
+              className="hidden rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 sm:inline-flex"
+              title={isExpanded ? "Compact width" : "Expand panel"}
+            >
+              {isExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            </button>
+            <button
+              onClick={onClose}
+              className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+              aria-label="Close details"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-1.5">
+
+        <div className="flex flex-wrap items-center gap-1.5">
           <button
             onClick={() => onToggleSave(item.id)}
             className={`flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-medium transition ${
@@ -134,7 +159,7 @@ export function ListingDrawer({
             title={isSaved ? "Remove from favorites" : "Favorite listing"}
           >
             <Heart className={`h-3.5 w-3.5 ${isSaved ? "fill-rose-400 text-rose-400" : ""}`} />
-            {isSaved ? "Favorited" : "Favorite"}
+            <span>{isSaved ? "Favorited" : "Favorite"}</span>
           </button>
           <button
             onClick={() => onToggleHide(item.id)}
@@ -146,18 +171,29 @@ export function ListingDrawer({
             title={isHidden ? "Unhide listing" : "Hide listing"}
           >
             {isHidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
-            <span className="hidden sm:inline">{isHidden ? "Hidden" : "Hide"}</span>
+            <span>{isHidden ? "Hidden" : "Hide"}</span>
           </button>
           {onShowOnMap && item.listing.latitude != null && item.listing.longitude != null && (
             <button
               onClick={onShowOnMap}
-              className="flex items-center gap-1 rounded-lg border border-zinc-800 px-2 py-1 text-xs font-medium text-zinc-300 transition hover:border-zinc-700 hover:text-zinc-100"
+              className="flex items-center gap-1 rounded-lg border border-zinc-800 px-2.5 py-1 text-xs font-medium text-zinc-300 transition hover:border-zinc-700 hover:text-zinc-100"
               title="Focus this listing on the map"
             >
               <MapPin className="h-3.5 w-3.5 text-blue-400" />
-              <span className="hidden sm:inline">Map</span>
+              <span>Map</span>
             </button>
           )}
+          <button
+            onClick={() => onTogglePin(item.id)}
+            className={`flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-medium transition ${
+              isPinned
+                ? "border-blue-500/50 bg-blue-500/15 text-blue-300"
+                : "border-zinc-800 text-zinc-300 hover:border-zinc-700"
+            }`}
+          >
+            <Scale className="h-3.5 w-3.5" />
+            <span>{isPinned ? "Pinned" : "Compare"}</span>
+          </button>
           <button
             onClick={() => {
               const url = new URL(window.location.href);
@@ -166,40 +202,11 @@ export function ListingDrawer({
               setCopied(true);
               setTimeout(() => setCopied(false), 1500);
             }}
-            className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+            className="flex items-center gap-1 rounded-lg border border-zinc-800 px-2.5 py-1 text-xs font-medium text-zinc-300 transition hover:border-zinc-700 hover:text-zinc-100"
             title="Copy direct link"
           >
-            {copied ? <Check className="h-4 w-4 text-teal-400" /> : <Link2 className="h-4 w-4" />}
-          </button>
-          <button
-            onClick={() =>
-              setWidth(
-                isExpanded
-                  ? UI_CONFIG.drawer.defaultWidth
-                  : Math.min(UI_CONFIG.drawer.expandedTarget, Math.round(window.innerWidth * 0.65))
-              )
-            }
-            className="hidden rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 sm:inline-flex"
-            title={isExpanded ? "Compact width" : "Expand panel"}
-          >
-            {isExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-          </button>
-          <button
-            onClick={() => onTogglePin(item.id)}
-            className={`hidden items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-medium sm:flex ${
-              isPinned
-                ? "border-blue-500/50 bg-blue-500/15 text-blue-300"
-                : "border-zinc-800 text-zinc-300 hover:border-zinc-700"
-            }`}
-          >
-            <Scale className="h-3.5 w-3.5" />
-            {isPinned ? "Pinned" : "Compare"}
-          </button>
-          <button
-            onClick={onClose}
-            className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
-          >
-            <X className="h-4 w-4" />
+            {copied ? <Check className="h-3.5 w-3.5 text-teal-400" /> : <Link2 className="h-3.5 w-3.5" />}
+            <span>{copied ? "Copied" : "Link"}</span>
           </button>
         </div>
       </div>

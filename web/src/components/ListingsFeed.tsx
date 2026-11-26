@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { Eye, EyeOff, Heart, Scale } from "lucide-react";
 import type { ScoredListing } from "../types";
 import { HoverTip } from "./InfoTip";
@@ -42,6 +43,14 @@ export function ListingsFeed({
   onToggleHide,
   onTogglePin,
 }: ListingsFeedProps) {
+  const cardRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+
+  useEffect(() => {
+    if (selectedId == null) return;
+    const el = cardRefs.current.get(selectedId);
+    el?.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
+  }, [selectedId]);
+
   return (
     <div
       style={isDesktop ? { width: `${rightPanelWidth}px` } : undefined}
@@ -77,9 +86,15 @@ export function ListingsFeed({
           return (
             <div
               key={item.id}
+              ref={(node) => {
+                if (node) cardRefs.current.set(item.id, node);
+                else cardRefs.current.delete(item.id);
+              }}
               onClick={() => onSelectListing(item)}
               className={`cursor-pointer p-3 transition ${
-                active ? "bg-zinc-800/70" : "hover:bg-zinc-900/80"
+                active
+                  ? "border-l-2 border-l-blue-400 bg-blue-500/10 ring-1 ring-inset ring-blue-500/35"
+                  : "hover:bg-zinc-900/80"
               } ${!item.passes_filters ? "opacity-60" : ""}`}
             >
               <div className="flex items-start justify-between gap-2">
