@@ -330,8 +330,11 @@ export function NycMap({ listings, selectedId, onSelect }: NycMapProps) {
           <div style="font-weight:700;margin-bottom:4px">🚇 ${st.name}</div>
           <div>${renderMtaBadges(st.routes)}</div>
         </div>`;
-      dot.bindTooltip(html, { direction: "top", offset: [0, -6] });
       dot.bindPopup(html, { closeButton: false, offset: [0, -4] });
+      if (window.matchMedia("(hover: hover)").matches) {
+        dot.bindTooltip(html, { direction: "top", offset: [0, -6] });
+        dot.on("popupopen", () => dot.closeTooltip());
+      }
       dot.addTo(group);
     }
   }, [showSubways, subways]);
