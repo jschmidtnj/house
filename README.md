@@ -49,9 +49,27 @@ pnpm --dir web build
 
 ### Production / Everyday Mode (Single Process)
 ```bash
-.venv/bin/house web --host 127.0.0.1 --port 8001
+.venv/bin/house web --host 127.0.0.1 --port 8000
 ```
-Then open **http://127.0.0.1:8001** in your browser. *(Use `--port 8000` if port 8000 is free; use `--host 0.0.0.0` if you want to open it from your phone on the same Wi-Fi network).*
+Then open **http://127.0.0.1:8000** in your browser.
+
+### View on Phone / Other Devices on the Same Wi-Fi
+Bind the server to `0.0.0.0`:
+```bash
+.venv/bin/house web --host 0.0.0.0 --port 8000
+```
+Find your Mac's local IP address:
+```bash
+ipconfig getifaddr en0
+```
+Then open `http://<YOUR-MAC-IP>:8000` (or `http://<your-mac-name>.local:8000`) from any phone or laptop on the same Wi-Fi network. *(If macOS Firewall prompts for incoming Python connections, click **Allow**).*
+
+#### Optional: Publish a Custom `house.local` Alias (`dns-sd`)
+To access the app at **http://house.local:8000** from any device on your Wi-Fi without renaming your Mac, run this in a separate terminal (keep it running while you want the alias active):
+```bash
+dns-sd -P house _http._tcp local 8000 house.local "$(ipconfig getifaddr en0)"
+```
+*(Or check your Mac's built-in `.local` name with `scutil --get LocalHostName` and use `http://<name>.local:8000` without running `dns-sd`).*
 
 ### Frontend Development Mode (Hot Reload)
 Run the FastAPI backend in one terminal and Vite in another:

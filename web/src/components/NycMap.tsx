@@ -199,7 +199,7 @@ export function NycMap({ listings, selectedId, onSelect }: NycMapProps) {
     const map = L.map(containerRef.current, {
       center: [40.722, -73.975],
       zoom: 12,
-      zoomControl: true,
+      zoomControl: false,
     });
 
     const subwayLinePane = map.createPane("subwayLinePane");
