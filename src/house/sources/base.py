@@ -40,15 +40,49 @@ def parse_int(value: Any) -> int | None:
 
 
 def normalize_property_type(raw: str | None) -> str:
-    """Map raw site labels into canonical NYC types: condo, coop, condop, townhouse."""
+    """Map raw site labels into canonical NYC types: condo, coop, condop, townhouse, multifamily."""
     text = (raw or "").lower().strip()
     if "condop" in text:
         return "condop"
     if "co-op" in text or "coop" in text or "cooperative" in text:
         return "coop"
-    if "townhouse" in text or "townhome" in text or "single family" in text or "multi" in text:
+    if "multi" in text or "duplex" in text or "triplex" in text:
+        return "multifamily"
+    if "townhouse" in text or "townhome" in text or "single_family" in text or "single family" in text:
         return "townhouse"
     return "condo"
+
+
+_WORD_TO_INT = {"two": 2, "three": 3, "four": 4, "2": 2, "3": 3, "4": 4}
+_UNIT_PATTERNS = [
+    re.compile(r"\b(two|three|four|2|3|4)[\s-]+(?:family|unit)\b", re.IGNORECASE),
+    re.compile(r"\b(2|3|4)\s*(?:units|families)\b", re.IGNORECASE),
+]
+
+
+def detect_num_units(
+    property_type: str,
+    description: str = "",
+    raw_units: Any = None,
+) -> int:
+    """Infer number of residential units (1-4) for NYC townhouses / multi-family buildings."""
+    if raw_units is not None:
+        val = parse_int(raw_units)
+        if val is not None and 1 <= val <= 12:
+            return val
+    ptype = (property_type or "").lower()
+    if ptype in ("condo", "coop", "condop"):
+        return 1
+    text = description or ""
+    for pat in _UNIT_PATTERNS:
+        m = pat.search(text)
+        if m:
+            num = _WORD_TO_INT.get(m.group(1).lower())
+            if num:
+                return num
+    if ptype == "multifamily":
+        return 2
+    return 1
 
 
 _AMENITY_KEYWORDS = {

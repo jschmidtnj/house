@@ -17,7 +17,8 @@ class ListingData:
     borough: str = ""
     neighborhood: str = ""
     zip_code: str = ""
-    property_type: str = "condo"  # condo | coop | condop | townhouse
+    property_type: str = "condo"  # condo | coop | condop | townhouse | multifamily
+    num_units: int = 1            # 1 for apartment/single-family; 2-4 for multi-unit townhouse
     price: float = 0.0
     beds: float = 0.0
     baths: float = 0.0
@@ -54,6 +55,13 @@ class CostBreakdown:
     monthly_tax: float
     monthly_insurance: float
     total_monthly_cost: float
+
+    # Multi-unit townhouse rental income offset ("house hacking")
+    num_units: int
+    rentable_units: int
+    estimated_gross_rental_income: float
+    estimated_net_rental_income: float
+    net_monthly_cost: float
 
     # Derived / advisory metrics
     effective_after_tax_monthly: float

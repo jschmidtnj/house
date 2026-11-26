@@ -25,6 +25,7 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
 from house.models import ListingData
+from house.sources.base import detect_num_units
 
 
 class Base(DeclarativeBase):
@@ -367,6 +368,11 @@ class Database:
         except (TypeError, ValueError):
             lat_f, lng_f = None, None
         photo = str(raw.get("primary_photo") or raw.get("photo_url") or "")
+        num_units = detect_num_units(
+            row.property_type,
+            row.description,
+            raw.get("units") or raw.get("num_units"),
+        )
         return ListingData(
             source=row.primary_source,
             external_id=str(row.id),
@@ -376,6 +382,7 @@ class Database:
             neighborhood=row.neighborhood,
             zip_code=row.zip_code,
             property_type=row.property_type,
+            num_units=num_units,
             price=row.price,
             beds=row.beds,
             baths=row.baths,

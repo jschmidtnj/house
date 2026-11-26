@@ -7,7 +7,7 @@ interface KnobSidebarProps {
   onReset: () => void;
 }
 
-const ALL_TYPES = ["condo", "coop", "condop", "townhouse"];
+const ALL_TYPES = ["condo", "coop", "condop", "townhouse", "multifamily"];
 
 export function KnobSidebar({ knobs, onChange, onReset }: KnobSidebarProps) {
   const grossMonthlyIncome = knobs.annual_income > 0 ? knobs.annual_income / 12 : 0;
@@ -189,6 +189,60 @@ export function KnobSidebar({ knobs, onChange, onReset }: KnobSidebarProps) {
             );
           })}
         </div>
+      </div>
+
+      {/* 2-3 Unit Townhouse House-Hacking Controls */}
+      <div className="space-y-2 rounded-xl border border-violet-500/30 bg-violet-950/20 p-3">
+        <div className="flex items-center justify-between text-xs font-semibold text-violet-300">
+          <span>2–3 Unit House Hacking</span>
+          <button
+            onClick={() =>
+              onChange({
+                ...knobs,
+                min_units: knobs.min_units >= 2 ? 1 : 2,
+                property_types:
+                  knobs.min_units >= 2
+                    ? ["condo", "coop", "condop", "townhouse", "multifamily"]
+                    : ["townhouse", "multifamily"],
+              })
+            }
+            className={`rounded-md border px-2 py-0.5 text-[10px] font-semibold ${
+              knobs.min_units >= 2
+                ? "border-violet-400 bg-violet-500/25 text-violet-200"
+                : "border-slate-700 text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            {knobs.min_units >= 2 ? "Multi-Unit Only" : "2–3 Unit Filter"}
+          </button>
+        </div>
+
+        <div className="space-y-1">
+          <div className="flex justify-between text-xs">
+            <span className="text-slate-400">Est. Rent / Extra Unit</span>
+            <span className="font-semibold text-violet-300">
+              ${knobs.est_rent_per_unit.toLocaleString()}/mo
+            </span>
+          </div>
+          <input
+            type="range"
+            min={1500}
+            max={6000}
+            step={100}
+            value={knobs.est_rent_per_unit}
+            onChange={(e) => set("est_rent_per_unit", Number(e.target.value))}
+            className="w-full accent-violet-400"
+          />
+        </div>
+
+        <label className="flex cursor-pointer items-center justify-between text-[11px] text-slate-300">
+          <span>Offset monthly cost by net rent (85%)</span>
+          <input
+            type="checkbox"
+            checked={knobs.use_net_rental_for_filter}
+            onChange={(e) => set("use_net_rental_for_filter", e.target.checked)}
+            className="accent-violet-400"
+          />
+        </label>
       </div>
 
       {/* Toggles */}

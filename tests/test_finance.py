@@ -99,3 +99,35 @@ def test_dti_calculation_and_coop_board_warning():
     assert costs.dti_pct is not None
     assert costs.dti_pct > 28.0
     assert any("Co-op board" in w for w in costs.warnings)
+
+
+def test_multifamily_townhouse_rental_offset():
+    budget = BudgetConfig(
+        annual_income=300_000,
+        down_payment_pct=20.0,
+        interest_rate_pct=6.5,
+        est_rent_per_unit=3_200.0,
+        rental_net_factor=0.85,
+        use_net_rental_for_filter=True,
+    )
+    townhouse = ListingData(
+        source="test",
+        external_id="th-3u",
+        address="220 Macon St",
+        borough="Brooklyn",
+        neighborhood="Bedford-Stuyvesant",
+        property_type="multifamily",
+        num_units=3,
+        price=1_650_000,
+        beds=5.0,
+        baths=3.0,
+        sqft=2800,
+        monthly_tax=550,
+    )
+    costs = calculate_cost_breakdown(townhouse, budget)
+    assert costs.num_units == 3
+    assert costs.rentable_units == 2
+    assert costs.estimated_gross_rental_income == 6_400.0
+    assert costs.estimated_net_rental_income == 5_440.0
+    assert costs.net_monthly_cost < costs.total_monthly_cost - 5_000.0
+    assert costs.monthly_hoa_or_maint == 0.0

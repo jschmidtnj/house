@@ -34,10 +34,15 @@ def score_listing(
     if listing.price < budget.min_price:
         rejections.append(f"Price ${listing.price:,.0f} < min ${budget.min_price:,.0f}")
 
+    if budget.use_net_rental_for_filter and costs.rentable_units > 0:
+        base_monthly = costs.net_monthly_cost
+    else:
+        base_monthly = costs.total_monthly_cost
+
     effective_monthly = (
-        costs.effective_after_tax_monthly
+        max(0.0, costs.effective_after_tax_monthly - (costs.estimated_net_rental_income if budget.use_net_rental_for_filter else 0.0))
         if budget.use_after_tax_for_filter
-        else costs.total_monthly_cost
+        else base_monthly
     )
     if effective_monthly > budget.max_monthly_cost:
         rejections.append(
@@ -50,13 +55,39 @@ def score_listing(
     if allowed_types and ptype not in allowed_types:
         rejections.append(f"Type '{ptype}' not in {allowed_types}")
 
+    if listing.num_units < search.min_units:
+        rejections.append(f"Units {listing.num_units} < min {search.min_units}")
+    if search.max_units and listing.num_units > search.max_units:
+        rejections.append(f"Units {listing.num_units} > max {search.max_units}")
+
     allowed_boroughs = [b.lower() for b in search.boroughs]
     if allowed_boroughs and listing.borough and listing.borough.lower() not in allowed_boroughs:
         rejections.append(f"Borough '{listing.borough}' not in {search.boroughs}")
 
     allowed_hoods = [n.lower() for n in search.neighborhoods]
-    if allowed_hoods and listing.neighborhood and listing.neighborhood.lower() not in allowed_hoods:
-        rejections.append(f"Neighborhood '{listing.neighborhood}' not in target list")
+    allowed_zips = {str(z).strip()[:5] for z in search.zip_codes if str(z).strip()}
+    listing_hood = (listing.neighborhood or "").strip().lower()
+    listing_zip = (listing.zip_code or "").strip()[:5]
+
+    if allowed_hoods or allowed_zips:
+        hood_match = bool(listing_hood and listing_hood in allowed_hoods)
+        zip_match = bool(listing_zip and listing_zip in allowed_zips)
+        if not (hood_match or zip_match):
+            loc_label = listing.neighborhood or listing.zip_code or listing.borough or "unknown"
+            rejections.append(f"Location '{loc_label}' outside target neighborhoods/zips")
+
+    # 2b. NYC-specific exclusions (HDFC income-restricted / land-lease)
+    desc_lower = (listing.description or "").lower()
+    if search.exclude_hdfc and any(
+        kw in desc_lower
+        for kw in ("hdfc", "income restricted", "income-restricted", "income cap", "mitchell-lama", "mitchell lama", "ami limit", "120% ami", "165% ami")
+    ):
+        rejections.append("Excluded: HDFC / income-restricted co-op")
+
+    if search.exclude_land_lease and any(
+        kw in desc_lower for kw in ("land lease", "land-lease", "ground lease")
+    ):
+        rejections.append("Excluded: land-lease building")
 
     # 3. Size & layout filters
     if listing.beds < search.min_beds:

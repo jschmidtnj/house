@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { BarChart3, Building2, Map as MapIcon, RefreshCw, Scale, Search } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { BarChart3, Building2, GripVertical, Map as MapIcon, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, RefreshCw, Scale, Search } from "lucide-react";
 import { AnalyticsView } from "./components/AnalyticsView";
 import { CompareBar } from "./components/CompareBar";
 import { KnobSidebar } from "./components/KnobSidebar";
@@ -15,9 +15,12 @@ const DEFAULT_KNOBS: KnobsState = {
   interest_rate_pct: 6.5,
   loan_term_years: 30,
   use_after_tax_for_filter: false,
+  est_rent_per_unit: 3200,
+  use_net_rental_for_filter: true,
+  min_units: 1,
   min_beds: 1,
   min_sqft: 600,
-  property_types: ["condo", "coop", "condop"],
+  property_types: ["condo", "coop", "condop", "townhouse", "multifamily"],
   exclude_hdfc: true,
   exclude_land_lease: false,
   show_rejected: false,
@@ -33,6 +36,34 @@ export function App() {
   const [tab, setTab] = useState<"map" | "analytics">("map");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [pinnedIds, setPinnedIds] = useState<number[]>([]);
+  const [rightPanelWidth, setRightPanelWidth] = useState<number>(400);
+  const [showSidebar, setShowSidebar] = useState<boolean>(true);
+  const [showRightPanel, setShowRightPanel] = useState<boolean>(true);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const splitRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!isDragging) return;
+    const onMove = (e: MouseEvent) => {
+      const container = splitRef.current;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      const fromRight = rect.right - e.clientX;
+      const clamped = Math.max(240, Math.min(Math.round(rect.width * 0.65), fromRight));
+      setRightPanelWidth(clamped);
+    };
+    const onUp = () => setIsDragging(false);
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, [isDragging]);
 
   useEffect(() => {
     fetch("/api/config")
@@ -46,6 +77,9 @@ export function App() {
           interest_rate_pct: cfg.budget.interest_rate_pct,
           loan_term_years: cfg.budget.loan_term_years,
           use_after_tax_for_filter: cfg.budget.use_after_tax_for_filter,
+          est_rent_per_unit: cfg.budget.est_rent_per_unit ?? 3200,
+          use_net_rental_for_filter: cfg.budget.use_net_rental_for_filter ?? true,
+          min_units: cfg.search.min_units ?? 1,
           min_beds: cfg.search.min_beds,
           min_sqft: cfg.search.min_sqft,
           property_types: cfg.search.property_types,
@@ -113,6 +147,13 @@ export function App() {
       {/* Top Bar */}
       <header className="flex shrink-0 items-center justify-between border-b border-slate-800 bg-slate-950 px-4 py-2.5">
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowSidebar((v) => !v)}
+            className="rounded-lg border border-slate-800 bg-slate-900 p-1.5 text-slate-400 hover:border-slate-700 hover:text-slate-100"
+            title={showSidebar ? "Hide knobs sidebar" : "Show knobs sidebar"}
+          >
+            {showSidebar ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
+          </button>
           <div className="flex items-center gap-2 font-bold tracking-tight text-slate-100">
             <Building2 className="h-5 w-5 text-emerald-400" />
             <span>house</span>
@@ -137,6 +178,17 @@ export function App() {
         </div>
 
         <div className="flex items-center gap-2">
+          {tab === "map" && (
+            <button
+              onClick={() => setShowRightPanel((v) => !v)}
+              className="flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-300 hover:border-slate-700 hover:text-slate-100"
+              title={showRightPanel ? "Hide listings panel" : "Show listings panel"}
+            >
+              {showRightPanel ? <PanelRightClose className="h-3.5 w-3.5" /> : <PanelRightOpen className="h-3.5 w-3.5" />}
+              <span className="hidden sm:inline">{showRightPanel ? "Hide List" : "Show List"}</span>
+            </button>
+          )}
+
           <div className="relative">
             <Search className="pointer-events-none absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-500" />
             <input
@@ -180,13 +232,15 @@ export function App() {
 
       {/* Body */}
       <div className="flex min-h-0 flex-1">
-        <KnobSidebar knobs={knobs} onChange={setKnobs} onReset={() => setKnobs(baseKnobs)} />
+        {showSidebar && (
+          <KnobSidebar knobs={knobs} onChange={setKnobs} onReset={() => setKnobs(baseKnobs)} />
+        )}
 
         <main className="flex min-w-0 flex-1 flex-col">
           {tab === "map" ? (
-            <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 p-3 lg:grid-cols-12">
+            <div ref={splitRef} className="flex min-h-0 flex-1 flex-col p-3 lg:flex-row">
               {/* Interactive NYC Map */}
-              <div className="min-h-[360px] lg:col-span-7">
+              <div className="min-h-[360px] min-w-0 flex-1">
                 <NycMap
                   listings={listings}
                   selectedId={selectedId}
@@ -194,8 +248,22 @@ export function App() {
                 />
               </div>
 
-              {/* Ranked Listings Feed */}
-              <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-800 bg-slate-950 lg:col-span-5">
+              {/* Draggable Split Handle + Ranked Listings Feed */}
+              {showRightPanel && (
+                <>
+                  <div
+                    onMouseDown={() => setIsDragging(true)}
+                    className={`hidden w-3 shrink-0 cursor-col-resize items-center justify-center lg:flex ${
+                      isDragging ? "text-emerald-400" : "text-slate-600 hover:text-slate-300"
+                    }`}
+                    title="Drag to resize listings panel"
+                  >
+                    <GripVertical className="h-5 w-4" />
+                  </div>
+                  <div
+                    style={{ width: `${rightPanelWidth}px` }}
+                    className="mt-3 flex min-h-0 shrink-0 flex-col overflow-hidden rounded-xl border border-slate-800 bg-slate-950 lg:mt-0"
+                  >
                 <div className="flex items-center justify-between border-b border-slate-800 px-3 py-2 text-xs text-slate-400">
                   <span>
                     {loading ? "Updating..." : `${listings.length} listings ranked by score`}
@@ -228,8 +296,10 @@ export function App() {
                           </div>
                           <div className="shrink-0 text-right">
                             <div className="text-sm font-bold text-emerald-400">
-                              ${Math.round(c.total_monthly_cost).toLocaleString()}
-                              <span className="text-[10px] font-normal text-slate-400">/mo</span>
+                              ${Math.round(c.rentable_units > 0 && knobs.use_net_rental_for_filter ? c.net_monthly_cost : c.total_monthly_cost).toLocaleString()}
+                              <span className="text-[10px] font-normal text-slate-400">
+                                {c.rentable_units > 0 && knobs.use_net_rental_for_filter ? "/mo net" : "/mo"}
+                              </span>
                             </div>
                             <div className="text-[11px] text-slate-400">
                               ${Math.round(l.price).toLocaleString()}
@@ -242,6 +312,11 @@ export function App() {
                             <span className="rounded bg-sky-500/15 px-1.5 py-0.5 font-semibold text-sky-300">
                               Score {item.score.toFixed(1)}
                             </span>
+                            {c.rentable_units > 0 && (
+                              <span className="rounded bg-violet-500/20 px-1.5 py-0.5 font-semibold text-violet-300">
+                                {c.num_units} Units (−${Math.round(c.estimated_net_rental_income / 1000 * 10) / 10}k rent)
+                              </span>
+                            )}
                             {c.dti_pct != null && (
                               <span
                                 className={`rounded px-1.5 py-0.5 ${
@@ -280,6 +355,8 @@ export function App() {
                   )}
                 </div>
               </div>
+                </>
+              )}
             </div>
           ) : (
             <AnalyticsView

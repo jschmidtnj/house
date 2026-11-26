@@ -10,6 +10,7 @@ from house.config import BudgetConfig, HomeHarvestSourceConfig, SearchConfig
 from house.models import ListingData
 from house.sources.base import (
     ListingSource,
+    detect_num_units,
     normalize_amenities,
     normalize_property_type,
     parse_currency,
@@ -99,6 +100,10 @@ def parse_homeharvest_row(row: dict[str, Any]) -> ListingData | None:
         if "condo" not in desc_lower or "co-op" in desc_lower or "cooperative" in desc_lower:
             ptype = "coop"
 
+    num_units = detect_num_units(ptype, description, _clean_val(row.get("units")))
+    if num_units >= 2 and ptype in ("townhouse", "condo"):
+        ptype = "multifamily"
+
     hoa_fee = parse_currency(_clean_val(row.get("hoa_fee")))
     monthly_hoa: float | None = None
     monthly_maint: float | None = None
@@ -134,6 +139,7 @@ def parse_homeharvest_row(row: dict[str, Any]) -> ListingData | None:
         neighborhood=neighborhood,
         zip_code=zip_code,
         property_type=ptype,
+        num_units=num_units,
         price=price,
         beds=beds,
         baths=baths,
@@ -179,33 +185,40 @@ class HomeHarvestSource(ListingSource):
             return []
 
         results: list[ListingData] = []
+        passes: list[list[str] | None] = [None]
+        if self.source_cfg.include_multifamily_pass:
+            passes.append(["multi_family", "townhomes"])
+
         for location in self.source_cfg.locations:
-            try:
-                kwargs: dict[str, Any] = {
-                    "location": location,
-                    "listing_type": "for_sale",
-                    "past_days": self.source_cfg.past_days,
-                    "limit": self.source_cfg.limit,
-                    "extra_property_data": self.source_cfg.extra_property_data,
-                    "price_max": int(self.budget.max_price),
-                }
-                if self.budget.min_price > 0:
-                    kwargs["price_min"] = int(self.budget.min_price)
-                if self.search.min_beds > 0:
-                    kwargs["beds_min"] = int(self.search.min_beds)
+            for ptypes in passes:
+                try:
+                    kwargs: dict[str, Any] = {
+                        "location": location,
+                        "listing_type": "for_sale",
+                        "past_days": self.source_cfg.past_days if ptypes is None else max(30, self.source_cfg.past_days),
+                        "limit": self.source_cfg.limit if ptypes is None else min(100, self.source_cfg.limit),
+                        "extra_property_data": self.source_cfg.extra_property_data,
+                        "price_max": int(self.budget.max_price),
+                    }
+                    if ptypes is not None:
+                        kwargs["property_type"] = ptypes
+                    if self.budget.min_price > 0:
+                        kwargs["price_min"] = int(self.budget.min_price)
+                    if self.search.min_beds > 0 and ptypes is None:
+                        kwargs["beds_min"] = int(self.search.min_beds)
 
-                df = scrape_property(**kwargs)
-            except Exception as exc:
-                logger.error("HomeHarvest fetch failed for '%s': %s", location, exc)
-                continue
+                    df = scrape_property(**kwargs)
+                except Exception as exc:
+                    logger.error("HomeHarvest fetch failed for '%s' (types=%s): %s", location, ptypes, exc)
+                    continue
 
-            if df is None or len(df) == 0:
-                continue
+                if df is None or len(df) == 0:
+                    continue
 
-            records = df.to_dict(orient="records") if hasattr(df, "to_dict") else list(df)
-            for rec in records:
-                if isinstance(rec, dict):
-                    parsed = parse_homeharvest_row(rec)
-                    if parsed is not None:
-                        results.append(parsed)
+                records = df.to_dict(orient="records") if hasattr(df, "to_dict") else list(df)
+                for rec in records:
+                    if isinstance(rec, dict):
+                        parsed = parse_homeharvest_row(rec)
+                        if parsed is not None:
+                            results.append(parsed)
         return results

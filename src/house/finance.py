@@ -124,7 +124,7 @@ def calculate_cost_breakdown(listing: ListingData, budget: BudgetConfig) -> Cost
             monthly_fees = float(listing.monthly_hoa)
         elif listing.monthly_maintenance is not None:
             monthly_fees = float(listing.monthly_maintenance)
-        elif ptype == "townhouse":
+        elif ptype in ("townhouse", "multifamily"):
             monthly_fees = 0.0
         else:
             est_sqft = listing.sqft or 800
@@ -135,13 +135,26 @@ def calculate_cost_breakdown(listing: ListingData, budget: BudgetConfig) -> Cost
         if listing.monthly_tax is not None and listing.monthly_tax >= 0:
             monthly_tax = float(listing.monthly_tax)
         else:
-            monthly_tax = (price * (budget.fallback_condo_tax_rate_pct / 100.0)) / 12.0
+            # NYC Tax Class 1 (1-3 family townhouses) has lower effective rate (~0.55%) than condos (~0.90%)
+            tax_rate = 0.55 if ptype in ("townhouse", "multifamily") else budget.fallback_condo_tax_rate_pct
+            monthly_tax = (price * (tax_rate / 100.0)) / 12.0
             tax_estimated = True
             warnings.append("Monthly property tax estimated (missing on listing)")
 
-    monthly_insurance = max(0.0, float(budget.monthly_insurance_default))
+    monthly_insurance = (
+        max(0.0, float(budget.townhouse_insurance_monthly))
+        if ptype in ("townhouse", "multifamily")
+        else max(0.0, float(budget.monthly_insurance_default))
+    )
     total_monthly = monthly_pi + monthly_fees + monthly_tax + monthly_insurance
     fees_ratio = ((monthly_fees + monthly_tax) / total_monthly) if total_monthly > 0 else 0.0
+
+    # Multi-unit townhouse ("house hacking") rental income offset
+    num_units = max(1, int(listing.num_units or 1))
+    rentable_units = max(0, num_units - 1) if ptype in ("townhouse", "multifamily") else 0
+    gross_rental = rentable_units * max(0.0, float(budget.est_rent_per_unit))
+    net_rental = gross_rental * max(0.0, min(1.0, float(budget.rental_net_factor)))
+    net_monthly_cost = max(0.0, total_monthly - net_rental)
 
     if fees_ratio > budget.max_monthly_fees_ratio:
         warnings.append(
@@ -149,14 +162,15 @@ def calculate_cost_breakdown(listing: ListingData, budget: BudgetConfig) -> Cost
             f"(threshold: {budget.max_monthly_fees_ratio * 100:.0f}%)"
         )
 
-    # Front-end housing DTI % (gross monthly housing / gross monthly income)
+    # Front-end housing DTI % (lenders credit ~75% of projected rental income for 2-4 unit owner-occupied)
     dti_pct: float | None = None
     if budget.annual_income and budget.annual_income > 0:
-        gross_monthly_income = budget.annual_income / 12.0
+        lender_rental_credit = gross_rental * 0.75
+        gross_monthly_income = (budget.annual_income / 12.0) + lender_rental_credit
         dti_pct = round((total_monthly / gross_monthly_income) * 100.0, 1)
         dti_limit = budget.coop_max_dti_pct if ptype == "coop" else budget.condo_max_dti_pct
         if dti_pct > dti_limit:
-            label = "Co-op board" if ptype == "coop" else "Condo lender"
+            label = "Co-op board" if ptype == "coop" else "Lender"
             warnings.append(
                 f"Housing DTI {dti_pct:.1f}% exceeds typical {label} cap ({dti_limit:.0f}%)"
             )
@@ -194,6 +208,11 @@ def calculate_cost_breakdown(listing: ListingData, budget: BudgetConfig) -> Cost
         monthly_tax=round(monthly_tax, 2),
         monthly_insurance=round(monthly_insurance, 2),
         total_monthly_cost=round(total_monthly, 2),
+        num_units=num_units,
+        rentable_units=rentable_units,
+        estimated_gross_rental_income=round(gross_rental, 2),
+        estimated_net_rental_income=round(net_rental, 2),
+        net_monthly_cost=round(net_monthly_cost, 2),
         effective_after_tax_monthly=round(effective_after_tax, 2),
         monthly_fees_ratio=round(fees_ratio, 4),
         dti_pct=dti_pct,

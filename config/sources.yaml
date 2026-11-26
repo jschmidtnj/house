@@ -10,9 +10,12 @@ sources:
     locations:
       - Manhattan, NY
       - Brooklyn, NY
-    past_days: 7
-    limit: 100
+      - Long Island City, NY
+      - Astoria, NY
+    past_days: 14
+    limit: 150
     extra_property_data: true
+    include_multifamily_pass: true
 
   # Local JSON/CSV exports dropped into data/imports/ (100% free, zero anti-bot issues)
   local_import:

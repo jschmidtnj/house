@@ -37,6 +37,10 @@ class BudgetConfig:
     use_after_tax_for_filter: bool = False
     marginal_tax_rate_pct: float = 42.0
     coop_tax_deductible_pct: float = 0.45
+    est_rent_per_unit: float = 3_200.0
+    rental_net_factor: float = 0.85
+    use_net_rental_for_filter: bool = True
+    townhouse_insurance_monthly: float = 275.0
 
 
 @dataclass
@@ -44,7 +48,11 @@ class SearchConfig:
     boroughs: list[str] = field(default_factory=list)
     neighborhoods: list[str] = field(default_factory=list)
     zip_codes: list[str] = field(default_factory=list)
-    property_types: list[str] = field(default_factory=lambda: ["condo", "coop", "condop"])
+    property_types: list[str] = field(
+        default_factory=lambda: ["condo", "coop", "condop", "townhouse", "multifamily"]
+    )
+    min_units: int = 1
+    max_units: int = 4
     exclude_hdfc: bool = True
     exclude_land_lease: bool = False
     min_beds: float = 1.0
@@ -73,6 +81,7 @@ class HomeHarvestSourceConfig:
     past_days: int = 7
     limit: int = 100
     extra_property_data: bool = True
+    include_multifamily_pass: bool = True
 
 
 @dataclass

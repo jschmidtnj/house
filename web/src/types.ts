@@ -11,6 +11,9 @@ export interface BudgetConfig {
   loan_term_years: number;
   monthly_insurance_default: number;
   use_after_tax_for_filter: boolean;
+  est_rent_per_unit: number;
+  rental_net_factor: number;
+  use_net_rental_for_filter: boolean;
 }
 
 export interface SearchConfig {
@@ -18,6 +21,8 @@ export interface SearchConfig {
   neighborhoods: string[];
   zip_codes: string[];
   property_types: string[];
+  min_units: number;
+  max_units: number;
   exclude_hdfc: boolean;
   exclude_land_lease: boolean;
   min_beds: number;
@@ -51,6 +56,11 @@ export interface CostBreakdown {
   monthly_tax: number;
   monthly_insurance: number;
   total_monthly_cost: number;
+  num_units: number;
+  rentable_units: number;
+  estimated_gross_rental_income: number;
+  estimated_net_rental_income: number;
+  net_monthly_cost: number;
   effective_after_tax_monthly: number;
   monthly_fees_ratio: number;
   dti_pct: number | null;
@@ -69,6 +79,7 @@ export interface ListingItem {
   neighborhood: string;
   zip_code: string;
   property_type: string;
+  num_units: number;
   price: number;
   beds: number;
   baths: number;
@@ -123,6 +134,9 @@ export interface KnobsState {
   interest_rate_pct: number;
   loan_term_years: number;
   use_after_tax_for_filter: boolean;
+  est_rent_per_unit: number;
+  use_net_rental_for_filter: boolean;
+  min_units: number;
   min_beds: number;
   min_sqft: number;
   property_types: string[];

@@ -34,9 +34,14 @@ class RankRequest(BaseModel):
     interest_rate_pct: float | None = None
     loan_term_years: int | None = None
     use_after_tax_for_filter: bool | None = None
+    est_rent_per_unit: float | None = None
+    rental_net_factor: float | None = None
+    use_net_rental_for_filter: bool | None = None
     min_beds: float | None = None
     min_baths: float | None = None
     min_sqft: int | None = None
+    min_units: int | None = None
+    max_units: int | None = None
     property_types: list[str] | None = None
     boroughs: list[str] | None = None
     neighborhoods: list[str] | None = None
@@ -68,6 +73,7 @@ def _serialize_scored(item: ScoredListing) -> dict[str, Any]:
             "neighborhood": l.neighborhood,
             "zip_code": l.zip_code,
             "property_type": l.property_type,
+            "num_units": l.num_units,
             "price": l.price,
             "beds": l.beds,
             "baths": l.baths,
@@ -106,6 +112,12 @@ def _apply_rank_request(base_cfg: AppConfig, req: RankRequest) -> AppConfig:
         cfg.budget.loan_term_years = req.loan_term_years
     if req.use_after_tax_for_filter is not None:
         cfg.budget.use_after_tax_for_filter = req.use_after_tax_for_filter
+    if req.est_rent_per_unit is not None:
+        cfg.budget.est_rent_per_unit = req.est_rent_per_unit
+    if req.rental_net_factor is not None:
+        cfg.budget.rental_net_factor = req.rental_net_factor
+    if req.use_net_rental_for_filter is not None:
+        cfg.budget.use_net_rental_for_filter = req.use_net_rental_for_filter
 
     if req.min_beds is not None:
         cfg.search.min_beds = req.min_beds
@@ -113,6 +125,10 @@ def _apply_rank_request(base_cfg: AppConfig, req: RankRequest) -> AppConfig:
         cfg.search.min_baths = req.min_baths
     if req.min_sqft is not None:
         cfg.search.min_sqft = req.min_sqft
+    if req.min_units is not None:
+        cfg.search.min_units = req.min_units
+    if req.max_units is not None:
+        cfg.search.max_units = req.max_units
     if req.property_types is not None:
         cfg.search.property_types = req.property_types
     if req.boroughs is not None:

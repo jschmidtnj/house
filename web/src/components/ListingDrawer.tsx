@@ -64,12 +64,16 @@ export function ListingDrawer({ item, onClose, isPinned, onTogglePin }: ListingD
         {/* Headline Stats */}
         <div className="grid grid-cols-3 gap-2">
           <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-2.5">
-            <div className="text-[11px] text-slate-400">All-In Monthly</div>
+            <div className="text-[11px] text-slate-400">
+              {c.rentable_units > 0 ? "Net Out-of-Pocket" : "All-In Monthly"}
+            </div>
             <div className="text-base font-bold text-emerald-400">
-              ${Math.round(c.total_monthly_cost).toLocaleString()}
+              ${Math.round(c.rentable_units > 0 ? c.net_monthly_cost : c.total_monthly_cost).toLocaleString()}
             </div>
             <div className="text-[10px] text-slate-500">
-              ~${Math.round(c.effective_after_tax_monthly).toLocaleString()} after-tax
+              {c.rentable_units > 0
+                ? `$${Math.round(c.total_monthly_cost).toLocaleString()} gross`
+                : `~$${Math.round(c.effective_after_tax_monthly).toLocaleString()} after-tax`}
             </div>
           </div>
           <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-2.5">
@@ -122,10 +126,22 @@ export function ListingDrawer({ item, onClose, isPinned, onTogglePin }: ListingD
             )}
             <div className="flex justify-between">
               <span className="flex items-center gap-1.5 text-slate-400">
-                <span className="h-2 w-2 rounded-full bg-emerald-400" /> HO-6 Insurance (est.)
+                <span className="h-2 w-2 rounded-full bg-emerald-400" /> Building / HO-6 Insurance
               </span>
               <span className="font-medium text-slate-100">${Math.round(c.monthly_insurance).toLocaleString()}/mo</span>
             </div>
+            {c.rentable_units > 0 && (
+              <>
+                <div className="flex justify-between border-t border-slate-800 pt-1 text-violet-300">
+                  <span>− Rental Offset ({c.rentable_units} unit{c.rentable_units > 1 ? "s" : ""}, 85% net)</span>
+                  <span className="font-semibold">−${Math.round(c.estimated_net_rental_income).toLocaleString()}/mo</span>
+                </div>
+                <div className="flex justify-between font-bold text-emerald-400">
+                  <span>Net Out-of-Pocket ({c.num_units}-Unit House Hack)</span>
+                  <span>${Math.round(c.net_monthly_cost).toLocaleString()}/mo</span>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
