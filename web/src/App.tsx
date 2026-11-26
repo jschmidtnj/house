@@ -37,7 +37,18 @@ const DEFAULT_KNOBS: KnobsState = {
   search_query: "",
 };
 
+function getSystemTheme(): "dark" | "light" {
+  if (typeof window === "undefined" || !window.matchMedia) return "dark";
+  return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+}
+
 export function App() {
+  const [theme, setTheme] = useState<"dark" | "light">(() => {
+    if (typeof window === "undefined") return "dark";
+    const saved = window.localStorage.getItem("house-theme");
+    if (saved === "light" || saved === "dark") return saved;
+    return getSystemTheme();
+  });
   const [isDesktop, setIsDesktop] = useState<boolean>(() =>
     typeof window !== "undefined" ? window.innerWidth >= 1024 : true
   );
@@ -77,6 +88,25 @@ export function App() {
     toggleInCustomList,
     deleteCustomList,
   } = useLists();
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle("light", theme === "light");
+    root.classList.toggle("dark", theme === "dark");
+  }, [theme]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(prefers-color-scheme: light)");
+    const onChange = (e: MediaQueryListEvent) => {
+      const saved = window.localStorage.getItem("house-theme");
+      if (saved !== "light" && saved !== "dark") {
+        setTheme(e.matches ? "light" : "dark");
+      }
+    };
+    mq.addEventListener?.("change", onChange);
+    return () => mq.removeEventListener?.("change", onChange);
+  }, []);
 
   useEffect(() => {
     const onResize = () => setIsDesktop(window.innerWidth >= 1024);
@@ -354,6 +384,18 @@ export function App() {
         onMobilePaneChange={setMobilePane}
         polling={polling}
         onPoll={handlePoll}
+        theme={theme}
+        onToggleTheme={() =>
+          setTheme((t) => {
+            const next = t === "dark" ? "light" : "dark";
+            try {
+              window.localStorage.setItem("house-theme", next);
+            } catch {
+              // ignore storage errors
+            }
+            return next;
+          })
+        }
       />
 
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
@@ -397,6 +439,7 @@ export function App() {
                     listings={listings}
                     selectedId={selectedId}
                     onSelect={(item) => setSelectedId(item.id)}
+                    theme={theme}
                   />
                 </div>
                 {showRightPanel && (
@@ -422,6 +465,7 @@ export function App() {
                       listings={listings}
                       selectedId={selectedId}
                       onSelect={(item) => setSelectedId(item.id)}
+                      theme={theme}
                     />
                   </div>
                 ) : (

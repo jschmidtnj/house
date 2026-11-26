@@ -4,12 +4,14 @@ import {
   Heart,
   List,
   Map as MapIcon,
+  Moon,
   PanelLeftClose,
   PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
   RefreshCw,
   Sliders,
+  Sun,
 } from "lucide-react";
 import type { RankSummary, ScoredListing } from "../types";
 import { SearchAutocomplete } from "./SearchAutocomplete";
@@ -36,6 +38,8 @@ interface TopHeaderProps {
   onMobilePaneChange: (p: "map" | "list") => void;
   polling: boolean;
   onPoll: () => void;
+  theme: "dark" | "light";
+  onToggleTheme: () => void;
 }
 
 export function TopHeader({
@@ -60,6 +64,8 @@ export function TopHeader({
   onMobilePaneChange,
   polling,
   onPoll,
+  theme,
+  onToggleTheme,
 }: TopHeaderProps) {
   return (
     <header className="flex shrink-0 items-center justify-between gap-2 border-b border-zinc-800/90 bg-zinc-950 px-3 py-2 lg:px-4 lg:py-2.5">
@@ -210,9 +216,18 @@ export function TopHeader({
         )}
 
         <button
+          onClick={onToggleTheme}
+          className="flex items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900 p-1.5 text-zinc-300 transition hover:border-zinc-700 hover:text-zinc-100"
+          title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+        >
+          {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+        </button>
+
+        <button
           onClick={onPoll}
           disabled={polling}
-          className="flex items-center gap-1.5 rounded-lg bg-zinc-100 px-2.5 py-1.5 text-xs font-semibold text-zinc-950 hover:bg-white disabled:opacity-50"
+          className="flex items-center gap-1.5 rounded-lg bg-zinc-100 px-2.5 py-1.5 text-xs font-semibold text-zinc-950 transition hover:opacity-90 disabled:opacity-50"
           title="Poll live listings"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${polling ? "animate-spin" : ""}`} />

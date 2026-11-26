@@ -66,21 +66,28 @@ export function AnalyticsView({ listings, maxMonthlyCost, onSelect }: AnalyticsV
         <div className="h-80 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <ScatterChart margin={{ top: 16, right: 20, bottom: 16, left: 4 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-zinc-800)" />
               <XAxis
                 type="number"
                 dataKey="monthly"
                 name="Monthly"
                 unit=""
                 tickFormatter={(v) => `$${(v / 1000).toFixed(1)}k`}
-                stroke="#a1a1aa"
+                stroke="var(--color-zinc-400)"
                 fontSize={11}
               />
-              <YAxis type="number" dataKey="score" name="Score" domain={[0, 100]} stroke="#a1a1aa" fontSize={11} />
+              <YAxis
+                type="number"
+                dataKey="score"
+                name="Score"
+                domain={[0, 100]}
+                stroke="var(--color-zinc-400)"
+                fontSize={11}
+              />
               <ZAxis type="number" dataKey="sqft" range={[50, 260]} />
-              <ReferenceLine x={maxMonthlyCost} stroke="#e4e4e7" strokeDasharray="4 4" />
+              <ReferenceLine x={maxMonthlyCost} stroke="var(--color-zinc-200)" strokeDasharray="4 4" />
               <Tooltip
-                cursor={{ strokeDasharray: "3 3", stroke: "#52525b" }}
+                cursor={{ strokeDasharray: "3 3", stroke: "var(--color-zinc-600)" }}
                 content={({ active, payload }) => {
                   if (!active || !payload || !payload.length) return null;
                   const d = payload[0]?.payload;
@@ -144,23 +151,34 @@ export function AnalyticsView({ listings, maxMonthlyCost, onSelect }: AnalyticsV
         <div className="h-80 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={hoodData} layout="vertical" margin={{ top: 8, right: 20, bottom: 8, left: 30 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-              <XAxis type="number" tickFormatter={(v) => `$${(v / 1000).toFixed(1)}k`} stroke="#a1a1aa" fontSize={11} />
-              <YAxis type="category" dataKey="hood" width={110} stroke="#d4d4d8" fontSize={11} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-zinc-800)" />
+              <XAxis
+                type="number"
+                tickFormatter={(v) => `$${(v / 1000).toFixed(1)}k`}
+                stroke="var(--color-zinc-400)"
+                fontSize={11}
+              />
+              <YAxis
+                type="category"
+                dataKey="hood"
+                width={110}
+                stroke="var(--color-zinc-200)"
+                fontSize={11}
+              />
               <Tooltip
-                cursor={{ fill: "rgba(255,255,255,0.04)" }}
+                cursor={{ fill: "var(--color-zinc-800)", fillOpacity: 0.35 }}
                 contentStyle={{
-                  backgroundColor: "#18181b",
-                  border: "1px solid #3f3f46",
+                  backgroundColor: "var(--color-zinc-950)",
+                  border: "1px solid var(--color-zinc-700)",
                   borderRadius: 8,
                   fontSize: 12,
-                  color: "#f4f4f5",
+                  color: "var(--color-zinc-100)",
                 }}
-                labelStyle={{ color: "#fafafa", fontWeight: 600 }}
-                itemStyle={{ color: "#93c5fd" }}
+                labelStyle={{ color: "var(--color-zinc-50)", fontWeight: 600 }}
+                itemStyle={{ color: "var(--color-blue-400)" }}
                 formatter={(val) => [`$${Number(val).toLocaleString()}/mo`, "Avg Monthly"]}
               />
-              <Bar dataKey="avgMonthly" fill="#60a5fa" radius={[0, 6, 6, 0]} />
+              <Bar dataKey="avgMonthly" fill="var(--color-blue-400)" radius={[0, 6, 6, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

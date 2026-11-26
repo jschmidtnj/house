@@ -53,7 +53,7 @@ export function CompareBar({ items, onRemove, onClear, onSelect }: CompareBarPro
           <div className="flex items-center gap-2">
             <button
               onClick={() => setExpanded(true)}
-              className="flex items-center gap-1 rounded-lg bg-zinc-100 px-2.5 py-1 text-[11px] font-semibold text-zinc-950 hover:bg-white"
+              className="flex items-center gap-1 rounded-lg bg-zinc-100 px-2.5 py-1 text-[11px] font-semibold text-zinc-950 transition hover:opacity-90"
             >
               <Maximize2 className="h-3 w-3" /> Expand SxS
             </button>

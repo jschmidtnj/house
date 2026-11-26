@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
-import { Layers, TrainFront } from "lucide-react";
+import { Layers, Map as MapIcon, TrainFront } from "lucide-react";
 import type { ScoredListing } from "../types";
 import {
   MTA_COLORS,
@@ -15,6 +15,7 @@ interface NycMapProps {
   listings: ScoredListing[];
   selectedId: number | null;
   onSelect: (item: ScoredListing) => void;
+  theme?: "dark" | "light";
 }
 
 type BasemapStyle = "dark" | "light" | "streets";
@@ -108,7 +109,7 @@ function shortHoodLabel(name: string): string {
   return `${parts[0]} / ${parts[1]}`;
 }
 
-export function NycMap({ listings, selectedId, onSelect }: NycMapProps) {
+export function NycMap({ listings, selectedId, onSelect, theme = "dark" }: NycMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const tileGroupRef = useRef<L.LayerGroup | null>(null);
@@ -117,13 +118,15 @@ export function NycMap({ listings, selectedId, onSelect }: NycMapProps) {
   const subwayLayerRef = useRef<L.LayerGroup | null>(null);
   const markerLayerRef = useRef<L.LayerGroup | null>(null);
 
-  const [style, setStyle] = useState<BasemapStyle>("dark");
+  const [showStreets, setShowStreets] = useState(false);
   const [showHoods, setShowHoods] = useState(true);
   const [showSubways, setShowSubways] = useState(true);
   const [zoom, setZoom] = useState<number>(12);
   const [hoodGeo, setHoodGeo] = useState<GeoJSON.FeatureCollection | null>(null);
   const [subwayLinesGeo, setSubwayLinesGeo] = useState<GeoJSON.FeatureCollection | null>(null);
   const [subways, setSubways] = useState<SubwayStation[]>([]);
+
+  const style: BasemapStyle = showStreets ? "streets" : theme;
 
   useEffect(() => {
     fetch("/data/nyc_neighborhoods.geojson?v=2")
@@ -444,19 +447,16 @@ export function NycMap({ listings, selectedId, onSelect }: NycMapProps) {
           <TrainFront className="h-3 w-3" /> Subways
         </button>
 
-        <div className="flex rounded-lg border border-zinc-800 bg-zinc-950/90 p-0.5 text-[11px] backdrop-blur">
-          {(Object.keys(BASEMAPS) as BasemapStyle[]).map((key) => (
-            <button
-              key={key}
-              onClick={() => setStyle(key)}
-              className={`rounded-md px-2 py-1 font-medium transition ${
-                style === key ? "bg-zinc-800 text-zinc-100" : "text-zinc-400 hover:text-zinc-200"
-              }`}
-            >
-              {BASEMAPS[key].label}
-            </button>
-          ))}
-        </div>
+        <button
+          onClick={() => setShowStreets((v) => !v)}
+          className={`flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[11px] font-medium backdrop-blur transition ${
+            showStreets
+              ? "border-blue-500/50 bg-zinc-900/90 text-blue-300"
+              : "border-zinc-800 bg-zinc-950/85 text-zinc-400 hover:text-zinc-200"
+          }`}
+        >
+          <MapIcon className="h-3 w-3" /> Streets
+        </button>
       </div>
 
       {/* Legend */}

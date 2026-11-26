@@ -410,24 +410,33 @@ export function ListingDrawer({
                     data={item.buy_vs_rent.yearly_series}
                     margin={{ top: 4, right: 8, bottom: 0, left: -12 }}
                   >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-                    <XAxis dataKey="year" tickFormatter={(v) => `Y${v}`} stroke="#71717a" fontSize={10} />
-                    <YAxis
-                      tickFormatter={(v) => `$${Math.round(v / 1000)}k`}
-                      stroke="#71717a"
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-zinc-800)" />
+                    <XAxis
+                      dataKey="year"
+                      tickFormatter={(v) => `Y${v}`}
+                      stroke="var(--color-zinc-400)"
                       fontSize={10}
                     />
-                    <ReferenceLine x={item.buy_vs_rent.hold_years} stroke="#a1a1aa" strokeDasharray="3 3" />
+                    <YAxis
+                      tickFormatter={(v) => `$${Math.round(v / 1000)}k`}
+                      stroke="var(--color-zinc-400)"
+                      fontSize={10}
+                    />
+                    <ReferenceLine
+                      x={item.buy_vs_rent.hold_years}
+                      stroke="var(--color-zinc-400)"
+                      strokeDasharray="3 3"
+                    />
                     <Tooltip
                       contentStyle={{
-                        backgroundColor: "#18181b",
-                        border: "1px solid #3f3f46",
+                        backgroundColor: "var(--color-zinc-950)",
+                        border: "1px solid var(--color-zinc-700)",
                         borderRadius: 8,
                         fontSize: 11,
-                        color: "#f4f4f5",
+                        color: "var(--color-zinc-100)",
                       }}
-                      labelStyle={{ color: "#fafafa", fontWeight: 600, marginBottom: 2 }}
-                      itemStyle={{ color: "#e4e4e7" }}
+                      labelStyle={{ color: "var(--color-zinc-50)", fontWeight: 600, marginBottom: 2 }}
+                      itemStyle={{ color: "var(--color-zinc-200)" }}
                       labelFormatter={(v) => `Year ${v}`}
                       formatter={(val, name) => [
                         `$${Math.round(Number(val)).toLocaleString()}`,
@@ -545,7 +554,7 @@ export function ListingDrawer({
             href={l.url}
             target="_blank"
             rel="noreferrer"
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-zinc-100 px-4 py-2 text-xs font-semibold text-zinc-950 hover:bg-white"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-zinc-100 px-4 py-2 text-xs font-semibold text-zinc-950 transition hover:opacity-90"
           >
             Open Full Listing <ExternalLink className="h-3.5 w-3.5" />
           </a>
