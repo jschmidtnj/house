@@ -1,0 +1,16 @@
+# Main house configuration entry point.
+# Section configs are split into modular files under config/ for readability.
+# Any keys defined directly in this file override values from the included files.
+
+database:
+  path: data/house.db
+
+# Cadence guardrails for periodic cron / launchd runs (`house run`)
+scheduler:
+  min_interval_minutes: 55        # Skip duplicate runs triggered within N minutes (override with --force)
+  poll_interval_minutes: 360      # Reuse stored listings if polled within N minutes (6h default for free API tiers)
+
+includes:
+  budget: budget.yaml
+  search: search.yaml
+  sources: sources.yaml

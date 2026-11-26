@@ -1,0 +1,29 @@
+# Financial & Monthly-Cost Knobs
+# Override any of these on the fly via CLI flags (`house rank --max-monthly 8500 --rate 6.25 --down 25`)
+
+# Hard ceiling on asking price
+max_price: 2000000
+min_price: 0
+
+# PRIMARY KNOB: Maximum all-in monthly housing cost (Mortgage P&I + Maintenance/HOA + Taxes + Insurance)
+max_monthly_cost: 9000
+
+# Mortgage assumptions
+down_payment_pct: 20.0            # Percentage of purchase price (e.g. 20.0 = 20%)
+max_cash_down: null               # Optional fixed cash cap in USD (e.g. 400000); if set, limits down payment
+interest_rate_pct: 6.50           # 30-year fixed annual interest rate (%)
+loan_term_years: 30
+
+# Monthly carrying cost defaults (used when a listing omits a field)
+monthly_insurance_default: 150.0  # HO-6 condo/co-op insurance estimate ($/mo)
+fallback_condo_tax_rate_pct: 0.90 # Effective annual NYC condo tax rate if listing omits monthly tax
+fallback_coop_maint_per_sqft: 2.25 # Fallback monthly co-op maintenance $/sqft if omitted
+
+# Optional carrying-cost guardrails
+max_monthly_fees_ratio: 0.40      # Warn/penalize if (HOA/Maint + Tax) > 40% of total monthly cost
+coop_min_down_pct: 20.0           # NYC co-ops typically require >= 20% down
+
+# Optional effective after-tax estimate (display only; filtering uses gross monthly cost by default)
+use_after_tax_for_filter: false
+marginal_tax_rate_pct: 37.0       # Combined federal + NY/NYC marginal rate for rough deduction estimate
+coop_tax_deductible_pct: 0.45     # Typical % of co-op maintenance that is tax-deductible (underlying mortgage + RE tax)

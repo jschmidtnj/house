@@ -1,0 +1,59 @@
+# Property Search Criteria & Composite Ranking Weights
+
+# NYC boroughs / neighborhoods to target (empty list = allow all)
+boroughs:
+  - Manhattan
+  - Brooklyn
+
+neighborhoods:
+  - Upper West Side
+  - Upper East Side
+  - Chelsea
+  - West Village
+  - Greenwich Village
+  - Gramercy
+  - Flatiron
+  - Park Slope
+  - Brooklyn Heights
+  - Cobble Hill
+  - Carroll Gardens
+  - Williamsburg
+  - Fort Greene
+  - Boerum Hill
+
+# Allowed property types: condo, coop, townhouse, condop
+property_types:
+  - condo
+  - coop
+  - condop
+
+# Size & layout minimums
+min_beds: 1.0
+min_baths: 1.0
+min_sqft: 650
+
+# Preferences (used for scoring bonuses, not hard exclusions unless listed in required_amenities)
+preferred_amenities:
+  - laundry_in_unit
+  - elevator
+  - dishwasher
+  - outdoor_space
+  - doorman
+  - gym
+
+required_amenities: []
+
+# Alerting thresholds
+min_score_to_notify: 55.0         # Only ping Discord for matches scoring >= this (0-100 scale)
+price_drop_notify_pct: 3.0        # Alert when an existing matching listing drops by >= N%
+
+# Composite score weights (normalized automatically)
+weights:
+  monthly_headroom: 0.35          # How far below max_monthly_cost the listing sits
+  price_per_sqft: 0.25            # Value relative to target_price_per_sqft
+  size_fit: 0.15                  # Bedrooms, bathrooms, and sqft comfort
+  amenities: 0.15                 # Match against preferred_amenities
+  price_drop: 0.10                # Bonus for recent price reductions / motivated sellers
+
+# Reference benchmark for $/sqft scoring
+target_price_per_sqft: 1400.0

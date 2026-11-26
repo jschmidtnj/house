@@ -1,0 +1,49 @@
+# Listing Sources Configuration
+# Enable one or more free / nearly-free adapters. All sources normalize into the same SQLite schema
+# and deduplicate by normalized (address, unit).
+
+sources:
+  # HomeHarvest (Realtor.com / MLS feed) — 100% free, unlimited, no API key required
+  # Install with: pip install -e ".[live]"
+  homeharvest:
+    enabled: true
+    locations:
+      - Manhattan, NY
+      - Brooklyn, NY
+    past_days: 7
+    limit: 100
+    extra_property_data: true
+
+  # Local JSON/CSV exports dropped into data/imports/ (100% free, zero anti-bot issues)
+  local_import:
+    enabled: true
+    import_dir: data/imports
+
+  # Saved-search email alerts via IMAP (StreetEasy, Redfin, Zillow, Compass) — 100% free
+  email_alerts:
+    enabled: false
+    sender_filters:
+      - streeteasy.com
+      - redfin.com
+      - zillow.com
+      - compass.com
+    max_emails_per_poll: 50
+
+  # RapidAPI StreetEasy wrapper ("NYC Real Estate API") — free tier available (~50-100 req/mo)
+  rapidapi_streeteasy:
+    enabled: false
+    areas:
+      - upper-west-side
+      - chelsea
+      - park-slope
+      - brooklyn-heights
+      - williamsburg
+    limit_per_area: 25
+
+  # RentCast official REST API — free tier (50 req/mo)
+  rentcast:
+    enabled: false
+    city: New York
+    state: NY
+    zip_codes: []
+    limit: 50

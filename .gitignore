@@ -221,3 +221,13 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# house local data & secrets
+data/*.db
+data/*.db-*
+data/*.lock
+data/imports/*.json
+data/imports/*.csv
+data/imports/*.yaml
+web/node_modules/
+web/dist/

@@ -1,0 +1,256 @@
+"""FastAPI backend serving ranked NYC listings, interactive knob recalculation, and static UI."""
+
+from __future__ import annotations
+
+import copy
+import json
+from dataclasses import asdict
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+
+from house.config import AppConfig, load_config
+from house.db import Database
+from house.finance import calculate_cost_breakdown
+from house.models import ScoredListing
+from house.scoring import rank_listings
+from house.sources import poll_all_sources
+
+
+class RankRequest(BaseModel):
+    """Live knob overrides from the Web UI."""
+
+    annual_income: float | None = None
+    max_monthly_cost: float | None = None
+    max_price: float | None = None
+    down_payment_pct: float | None = None
+    max_cash_down: float | None = None
+    interest_rate_pct: float | None = None
+    loan_term_years: int | None = None
+    use_after_tax_for_filter: bool | None = None
+    min_beds: float | None = None
+    min_baths: float | None = None
+    min_sqft: int | None = None
+    property_types: list[str] | None = None
+    boroughs: list[str] | None = None
+    neighborhoods: list[str] | None = None
+    exclude_hdfc: bool | None = None
+    exclude_land_lease: bool | None = None
+    show_rejected: bool = False
+    search_query: str = ""
+
+
+def _serialize_scored(item: ScoredListing) -> dict[str, Any]:
+    l = item.listing
+    c = item.costs
+    ppsf = round(l.price / l.sqft, 0) if l.sqft and l.sqft > 0 else None
+    return {
+        "id": item.listing_id,
+        "canonical_key": item.canonical_key,
+        "score": item.score,
+        "passes_filters": item.passes_filters,
+        "rejection_reasons": item.rejection_reasons,
+        "score_components": item.score_components,
+        "price_drop_pct": item.price_drop_pct,
+        "initial_price": item.initial_price,
+        "sources": item.sources,
+        "price_per_sqft": ppsf,
+        "listing": {
+            "address": l.address,
+            "unit": l.unit,
+            "borough": l.borough,
+            "neighborhood": l.neighborhood,
+            "zip_code": l.zip_code,
+            "property_type": l.property_type,
+            "price": l.price,
+            "beds": l.beds,
+            "baths": l.baths,
+            "sqft": l.sqft,
+            "monthly_hoa": l.monthly_hoa,
+            "monthly_maintenance": l.monthly_maintenance,
+            "monthly_tax": l.monthly_tax,
+            "status": l.status,
+            "days_on_market": l.days_on_market,
+            "url": l.url,
+            "latitude": l.latitude,
+            "longitude": l.longitude,
+            "photo_url": l.photo_url,
+            "amenities": l.amenities,
+            "description": l.description,
+        },
+        "costs": asdict(c),
+    }
+
+
+def _apply_rank_request(base_cfg: AppConfig, req: RankRequest) -> AppConfig:
+    cfg = copy.deepcopy(base_cfg)
+    if req.annual_income is not None:
+        cfg.budget.annual_income = req.annual_income
+    if req.max_monthly_cost is not None:
+        cfg.budget.max_monthly_cost = req.max_monthly_cost
+    if req.max_price is not None:
+        cfg.budget.max_price = req.max_price
+    if req.down_payment_pct is not None:
+        cfg.budget.down_payment_pct = req.down_payment_pct
+    if req.max_cash_down is not None:
+        cfg.budget.max_cash_down = req.max_cash_down if req.max_cash_down > 0 else None
+    if req.interest_rate_pct is not None:
+        cfg.budget.interest_rate_pct = req.interest_rate_pct
+    if req.loan_term_years is not None:
+        cfg.budget.loan_term_years = req.loan_term_years
+    if req.use_after_tax_for_filter is not None:
+        cfg.budget.use_after_tax_for_filter = req.use_after_tax_for_filter
+
+    if req.min_beds is not None:
+        cfg.search.min_beds = req.min_beds
+    if req.min_baths is not None:
+        cfg.search.min_baths = req.min_baths
+    if req.min_sqft is not None:
+        cfg.search.min_sqft = req.min_sqft
+    if req.property_types is not None:
+        cfg.search.property_types = req.property_types
+    if req.boroughs is not None:
+        cfg.search.boroughs = req.boroughs
+    if req.neighborhoods is not None:
+        cfg.search.neighborhoods = req.neighborhoods
+    if req.exclude_hdfc is not None:
+        cfg.search.exclude_hdfc = req.exclude_hdfc
+    if req.exclude_land_lease is not None:
+        cfg.search.exclude_land_lease = req.exclude_land_lease
+    return cfg
+
+
+def create_app(config_path: str | Path = "config/default.yaml") -> FastAPI:
+    app = FastAPI(title="House NYC Apartment Optimizer API", version="0.1.0")
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    cfg_path = Path(config_path)
+
+    @app.get("/api/config")
+    def get_config() -> dict[str, Any]:
+        cfg = load_config(cfg_path)
+        with Database(cfg.database_path) as db:
+            counts = db.status_counts()
+            last_poll = db.get_bot_state("last_poll_at")
+            last_run = db.get_bot_state("last_run_at")
+        return {
+            "budget": asdict(cfg.budget),
+            "search": asdict(cfg.search),
+            "status": {
+                **counts,
+                "last_poll_at": last_poll,
+                "last_run_at": last_run,
+            },
+        }
+
+    @app.post("/api/rank")
+    def post_rank(req: RankRequest) -> dict[str, Any]:
+        base_cfg = load_config(cfg_path)
+        cfg = _apply_rank_request(base_cfg, req)
+        with Database(cfg.database_path) as db:
+            rows = db.get_listings(status="active")
+
+        scored = rank_listings(rows, cfg.budget, cfg.search, include_rejected=req.show_rejected)
+        q = (req.search_query or "").strip().lower()
+        if q:
+            scored = [
+                s
+                for s in scored
+                if q in s.listing.address.lower()
+                or q in s.listing.neighborhood.lower()
+                or q in s.listing.borough.lower()
+                or q in s.listing.zip_code.lower()
+                or q in s.listing.description.lower()
+            ]
+
+        matching = [s for s in scored if s.passes_filters]
+        avg_monthly = (
+            round(sum(s.costs.total_monthly_cost for s in matching) / len(matching), 0)
+            if matching
+            else 0.0
+        )
+        avg_price = (
+            round(sum(s.listing.price for s in matching) / len(matching), 0)
+            if matching
+            else 0.0
+        )
+        with_coords = sum(1 for s in scored if s.listing.latitude and s.listing.longitude)
+
+        return {
+            "summary": {
+                "total_active": len(rows),
+                "total_returned": len(scored),
+                "matching_count": len(matching),
+                "with_coordinates": with_coords,
+                "avg_monthly_cost": avg_monthly,
+                "avg_price": avg_price,
+            },
+            "listings": [_serialize_scored(s) for s in scored],
+        }
+
+    @app.get("/api/listings/{listing_id}")
+    def get_listing_detail(listing_id: int) -> dict[str, Any]:
+        cfg = load_config(cfg_path)
+        with Database(cfg.database_path) as db:
+            row = db.get_listing(listing_id)
+            if row is None:
+                raise HTTPException(status_code=404, detail="Listing not found")
+            history = db.get_price_history(listing_id)
+
+        item = Database.to_listing_data(row)
+        costs = calculate_cost_breakdown(item, cfg.budget)
+        return {
+            "id": row.id,
+            "sources": json.loads(row.sources_json or "[]"),
+            "listing": asdict(item),
+            "costs": asdict(costs),
+            "price_history": [
+                {
+                    "recorded_at": h.recorded_at,
+                    "price": h.price,
+                    "monthly_hoa": h.monthly_hoa,
+                    "monthly_maintenance": h.monthly_maintenance,
+                    "monthly_tax": h.monthly_tax,
+                    "status": h.status,
+                    "source": h.source,
+                }
+                for h in history
+            ],
+        }
+
+    @app.post("/api/poll")
+    def post_poll(synthetic: bool = False) -> dict[str, Any]:
+        cfg = load_config(cfg_path)
+        items, by_source = poll_all_sources(cfg, synthetic=synthetic)
+        with Database(cfg.database_path) as db:
+            summary = db.upsert_listings(items)
+            db.set_bot_state("last_poll_at", datetime.now(timezone.utc).isoformat())
+        return {"sources": by_source, "upsert": summary}
+
+    # Serve built Vite SPA if web/dist exists
+    dist_dir = Path("web/dist")
+    if dist_dir.exists():
+        assets_dir = dist_dir / "assets"
+        if assets_dir.exists():
+            app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+
+        @app.get("/{full_path:path}")
+        def serve_spa(full_path: str) -> FileResponse:
+            candidate = dist_dir / full_path
+            if full_path and candidate.is_file():
+                return FileResponse(str(candidate))
+            return FileResponse(str(dist_dir / "index.html"))
+
+    return app
