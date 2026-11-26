@@ -4,6 +4,8 @@ boroughs:
   - Manhattan
   - Brooklyn
   - Queens
+  - Jersey City
+  - Hoboken
 
 neighborhoods:
   - East Village
@@ -51,8 +53,26 @@ neighborhoods:
   - Long Island City
   - Hunters Point
   - Astoria
+  - Jersey City
+  - Downtown Jersey City
+  - Paulus Hook
+  - Newport
+  - Exchange Place
+  - Hamilton Park
+  - Van Vorst Park
+  - Journal Square
+  - The Heights
+  - Hoboken
 
 zip_codes:
+  - "07030"
+  - "07302"
+  - "07304"
+  - "07305"
+  - "07306"
+  - "07307"
+  - "07310"
+  - "07311"
   - "10002"
   - "10003"
   - "10004"
@@ -107,6 +127,8 @@ exclude_land_lease: false
 min_beds: 1.0
 min_baths: 1.0
 min_sqft: 600
+max_commute_minutes: null         # Optional cap in minutes to Midtown Manhattan (e.g. 30)
+nj_max_walk_to_path_min: 15       # Max walking minutes to nearest PATH station for Jersey City & Hoboken
 
 preferred_amenities:
   - laundry_in_unit
@@ -122,10 +144,11 @@ min_score_to_notify: 55.0
 price_drop_notify_pct: 3.0
 
 weights:
-  monthly_headroom: 0.35
-  price_per_sqft: 0.25
+  monthly_headroom: 0.30
+  price_per_sqft: 0.20
+  commute: 0.15
   size_fit: 0.15
-  amenities: 0.15
-  price_drop: 0.10
+  amenities: 0.12
+  price_drop: 0.08
 
 target_price_per_sqft: 1400.0

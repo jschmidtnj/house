@@ -9,25 +9,25 @@ body,
 }
 
 .leaflet-container {
-  background: #0f172a;
+  background: #09090b;
   font-family: inherit;
 }
 
 .leaflet-popup-content-wrapper {
-  background: #0f172a;
-  color: #f1f5f9;
-  border: 1px solid #334155;
+  background: #18181b;
+  color: #f4f4f5;
+  border: 1px solid #27272a;
   border-radius: 0.75rem;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
 }
 
 .leaflet-popup-tip {
-  background: #0f172a;
-  border: 1px solid #334155;
+  background: #18181b;
+  border: 1px solid #27272a;
 }
 
 .leaflet-popup-close-button {
-  color: #94a3b8 !important;
+  color: #a1a1aa !important;
 }
 
 .house-pin {
@@ -40,14 +40,14 @@ path.leaflet-interactive:focus {
 }
 
 .hood-tooltip {
-  background: rgba(15, 23, 42, 0.92) !important;
-  color: #e2e8f0 !important;
-  border: 1px solid #334155 !important;
+  background: rgba(24, 24, 27, 0.94) !important;
+  color: #e4e4e7 !important;
+  border: 1px solid #3f3f46 !important;
   border-radius: 6px !important;
   font-size: 11px !important;
-  font-weight: 600 !important;
+  font-weight: 500 !important;
   padding: 2px 7px !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45) !important;
 }
 
 .hood-tooltip::before {
@@ -58,15 +58,15 @@ path.leaflet-interactive:focus {
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
-  color: rgba(203, 213, 225, 0.72);
+  color: rgba(212, 212, 216, 0.7);
   font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  text-shadow: 0 1px 4px rgba(2, 6, 23, 0.95);
+  text-shadow: 0 1px 4px rgba(9, 9, 11, 0.95);
   pointer-events: none;
 }
 
 .hood-label-target {
-  color: rgba(110, 231, 183, 0.92);
+  color: rgba(228, 228, 231, 0.9);
 }

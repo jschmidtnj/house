@@ -28,6 +28,8 @@ export interface SearchConfig {
   min_beds: number;
   min_baths: number;
   min_sqft: number;
+  max_commute_minutes: number | null;
+  nj_max_walk_to_path_min: number | null;
 }
 
 export interface ConfigResponse {
@@ -108,6 +110,11 @@ export interface ScoredListing {
   initial_price: number | null;
   sources: string[];
   price_per_sqft: number | null;
+  commute_minutes: number | null;
+  commute_mode: string;
+  nearest_station: string;
+  nearest_routes: string[];
+  walk_to_station_min: number | null;
   listing: ListingItem;
   costs: CostBreakdown;
 }
@@ -139,6 +146,8 @@ export interface KnobsState {
   min_units: number;
   min_beds: number;
   min_sqft: number;
+  max_commute_minutes: number; // 0 = no cap
+  nj_max_walk_to_path_min: number; // 0 = no cap
   property_types: string[];
   exclude_hdfc: boolean;
   exclude_land_lease: boolean;

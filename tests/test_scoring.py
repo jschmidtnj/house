@@ -128,3 +128,93 @@ def test_hdfc_excluded_and_zip_code_fallback_enforced():
     assert not score_listing(1, "h1", hdfc, budget, search).passes_filters
     assert not score_listing(2, "h2", out_of_area, budget, search).passes_filters
     assert score_listing(3, "h3", zip_fallback_ok, budget, search).passes_filters
+
+
+def test_midtown_commute_scoring_and_filter():
+    budget = BudgetConfig(max_price=2_000_000, max_monthly_cost=9_000)
+    search = SearchConfig(boroughs=[], neighborhoods=[], property_types=["condo"], max_commute_minutes=30)
+
+    midtown_east = ListingData(
+        source="test",
+        external_id="me-1",
+        address="300 E 46th St",
+        property_type="condo",
+        price=1_000_000,
+        beds=1.0,
+        baths=1.0,
+        sqft=750,
+        monthly_hoa=800,
+        monthly_tax=700,
+        latitude=40.7520,
+        longitude=-73.9705,
+    )
+    far_brooklyn = ListingData(
+        source="test",
+        external_id="fb-1",
+        address="1500 Ocean Pkwy",
+        property_type="condo",
+        price=1_000_000,
+        beds=1.0,
+        baths=1.0,
+        sqft=750,
+        monthly_hoa=800,
+        monthly_tax=700,
+        latitude=40.6120,
+        longitude=-73.9680,
+    )
+
+    s_near = score_listing(1, "k1", midtown_east, budget, search)
+    s_far = score_listing(2, "k2", far_brooklyn, budget, search)
+
+    assert s_near.commute_minutes is not None and s_far.commute_minutes is not None
+    assert s_near.commute_minutes < s_far.commute_minutes
+    assert s_near.score > s_far.score
+    assert s_near.passes_filters is True
+    assert s_far.passes_filters is False
+
+
+def test_nj_max_walk_to_path_filters_far_jc():
+    budget = BudgetConfig(max_price=2_000_000, max_monthly_cost=9_000)
+    search = SearchConfig(
+        boroughs=["Jersey City", "Hoboken"],
+        neighborhoods=[],
+        zip_codes=["07302", "07305"],
+        property_types=["condo"],
+        nj_max_walk_to_path_min=15,
+    )
+    near_grove_path = ListingData(
+        source="test",
+        external_id="jc-near",
+        address="150 Bay St",
+        borough="Jersey City",
+        zip_code="07302",
+        property_type="condo",
+        price=850_000,
+        beds=1.0,
+        baths=1.0,
+        sqft=750,
+        monthly_hoa=600,
+        monthly_tax=900,
+        latitude=40.7205,
+        longitude=-74.0390,
+    )
+    far_greenville = ListingData(
+        source="test",
+        external_id="jc-far",
+        address="100 Danforth Ave",
+        borough="Jersey City",
+        zip_code="07305",
+        property_type="condo",
+        price=550_000,
+        beds=2.0,
+        baths=1.0,
+        sqft=900,
+        monthly_hoa=350,
+        monthly_tax=500,
+        latitude=40.6950,
+        longitude=-74.0920,
+    )
+    assert score_listing(1, "j1", near_grove_path, budget, search).passes_filters is True
+    res_far = score_listing(2, "j2", far_greenville, budget, search)
+    assert res_far.passes_filters is False
+    assert any("Walk to PATH" in r for r in res_far.rejection_reasons)

@@ -12,6 +12,8 @@ sources:
       - Brooklyn, NY
       - Long Island City, NY
       - Astoria, NY
+      - Jersey City, NJ
+      - Hoboken, NJ
     past_days: 14
     limit: 150
     extra_property_data: true

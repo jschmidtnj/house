@@ -92,3 +92,8 @@ class ScoredListing:
     price_drop_pct: float = 0.0
     initial_price: float | None = None
     sources: list[str] = field(default_factory=list)
+    commute_minutes: int | None = None
+    commute_mode: str = ""
+    nearest_station: str = ""
+    nearest_routes: list[str] = field(default_factory=list)
+    walk_to_station_min: int | None = None

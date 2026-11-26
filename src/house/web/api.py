@@ -42,6 +42,8 @@ class RankRequest(BaseModel):
     min_sqft: int | None = None
     min_units: int | None = None
     max_units: int | None = None
+    max_commute_minutes: int | None = None
+    nj_max_walk_to_path_min: int | None = None
     property_types: list[str] | None = None
     boroughs: list[str] | None = None
     neighborhoods: list[str] | None = None
@@ -66,6 +68,11 @@ def _serialize_scored(item: ScoredListing) -> dict[str, Any]:
         "initial_price": item.initial_price,
         "sources": item.sources,
         "price_per_sqft": ppsf,
+        "commute_minutes": item.commute_minutes,
+        "commute_mode": item.commute_mode,
+        "nearest_station": item.nearest_station,
+        "nearest_routes": item.nearest_routes,
+        "walk_to_station_min": item.walk_to_station_min,
         "listing": {
             "address": l.address,
             "unit": l.unit,
@@ -129,6 +136,10 @@ def _apply_rank_request(base_cfg: AppConfig, req: RankRequest) -> AppConfig:
         cfg.search.min_units = req.min_units
     if req.max_units is not None:
         cfg.search.max_units = req.max_units
+    if req.max_commute_minutes is not None:
+        cfg.search.max_commute_minutes = req.max_commute_minutes if req.max_commute_minutes > 0 else None
+    if req.nj_max_walk_to_path_min is not None:
+        cfg.search.nj_max_walk_to_path_min = req.nj_max_walk_to_path_min if req.nj_max_walk_to_path_min > 0 else None
     if req.property_types is not None:
         cfg.search.property_types = req.property_types
     if req.boroughs is not None:

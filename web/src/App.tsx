@@ -20,6 +20,8 @@ const DEFAULT_KNOBS: KnobsState = {
   min_units: 1,
   min_beds: 1,
   min_sqft: 600,
+  max_commute_minutes: 0,
+  nj_max_walk_to_path_min: 15,
   property_types: ["condo", "coop", "condop", "townhouse", "multifamily"],
   exclude_hdfc: true,
   exclude_land_lease: false,
@@ -36,15 +38,20 @@ export function App() {
   const [tab, setTab] = useState<"map" | "analytics">("map");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [pinnedIds, setPinnedIds] = useState<number[]>([]);
+  const [leftSidebarWidth, setLeftSidebarWidth] = useState<number>(288);
   const [rightPanelWidth, setRightPanelWidth] = useState<number>(400);
   const [showSidebar, setShowSidebar] = useState<boolean>(true);
   const [showRightPanel, setShowRightPanel] = useState<boolean>(true);
-  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [dragTarget, setDragTarget] = useState<"left" | "right" | null>(null);
   const splitRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (!isDragging) return;
+    if (!dragTarget) return;
     const onMove = (e: MouseEvent) => {
+      if (dragTarget === "left") {
+        setLeftSidebarWidth(Math.max(240, Math.min(520, e.clientX)));
+        return;
+      }
       const container = splitRef.current;
       if (!container) return;
       const rect = container.getBoundingClientRect();
@@ -52,7 +59,7 @@ export function App() {
       const clamped = Math.max(240, Math.min(Math.round(rect.width * 0.65), fromRight));
       setRightPanelWidth(clamped);
     };
-    const onUp = () => setIsDragging(false);
+    const onUp = () => setDragTarget(null);
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
     document.body.style.cursor = "col-resize";
@@ -63,7 +70,7 @@ export function App() {
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
     };
-  }, [isDragging]);
+  }, [dragTarget]);
 
   useEffect(() => {
     fetch("/api/config")
@@ -82,6 +89,8 @@ export function App() {
           min_units: cfg.search.min_units ?? 1,
           min_beds: cfg.search.min_beds,
           min_sqft: cfg.search.min_sqft,
+          max_commute_minutes: cfg.search.max_commute_minutes ?? 0,
+          nj_max_walk_to_path_min: cfg.search.nj_max_walk_to_path_min ?? 15,
           property_types: cfg.search.property_types,
           exclude_hdfc: cfg.search.exclude_hdfc,
           exclude_land_lease: cfg.search.exclude_land_lease,
@@ -143,33 +152,33 @@ export function App() {
   };
 
   return (
-    <div className="flex h-screen flex-col bg-slate-950 text-slate-100">
+    <div className="flex h-screen flex-col bg-zinc-950 text-zinc-100">
       {/* Top Bar */}
-      <header className="flex shrink-0 items-center justify-between border-b border-slate-800 bg-slate-950 px-4 py-2.5">
+      <header className="flex shrink-0 items-center justify-between border-b border-zinc-800/90 bg-zinc-950 px-4 py-2.5">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setShowSidebar((v) => !v)}
-            className="rounded-lg border border-slate-800 bg-slate-900 p-1.5 text-slate-400 hover:border-slate-700 hover:text-slate-100"
+            className="rounded-lg border border-zinc-800 bg-zinc-900 p-1.5 text-zinc-400 hover:border-zinc-700 hover:text-zinc-100"
             title={showSidebar ? "Hide knobs sidebar" : "Show knobs sidebar"}
           >
             {showSidebar ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
           </button>
-          <div className="flex items-center gap-2 font-bold tracking-tight text-slate-100">
-            <Building2 className="h-5 w-5 text-emerald-400" />
+          <div className="flex items-center gap-2 font-semibold tracking-tight text-zinc-100">
+            <Building2 className="h-4 w-4 text-blue-400" />
             <span>house</span>
-            <span className="rounded-md bg-slate-800 px-1.5 py-0.5 text-[10px] font-medium text-emerald-300">
+            <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] font-medium text-zinc-300">
               NYC
             </span>
           </div>
-          <div className="hidden items-center gap-3 text-xs text-slate-400 md:flex">
+          <div className="hidden items-center gap-3 text-xs text-zinc-400 md:flex">
             <span>
-              Matches: <strong className="text-emerald-400">{rankData?.summary.matching_count ?? 0}</strong> /{" "}
+              Matches: <strong className="text-zinc-100">{rankData?.summary.matching_count ?? 0}</strong> /{" "}
               {rankData?.summary.total_active ?? 0} active
             </span>
             {rankData && rankData.summary.avg_monthly_cost > 0 && (
               <span>
                 Avg Monthly:{" "}
-                <strong className="text-slate-200">
+                <strong className="text-zinc-200">
                   ${Math.round(rankData.summary.avg_monthly_cost).toLocaleString()}/mo
                 </strong>
               </span>
@@ -181,7 +190,7 @@ export function App() {
           {tab === "map" && (
             <button
               onClick={() => setShowRightPanel((v) => !v)}
-              className="flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-300 hover:border-slate-700 hover:text-slate-100"
+              className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900 px-2.5 py-1.5 text-xs text-zinc-300 hover:border-zinc-700 hover:text-zinc-100"
               title={showRightPanel ? "Hide listings panel" : "Show listings panel"}
             >
               {showRightPanel ? <PanelRightClose className="h-3.5 w-3.5" /> : <PanelRightOpen className="h-3.5 w-3.5" />}
@@ -190,21 +199,21 @@ export function App() {
           )}
 
           <div className="relative">
-            <Search className="pointer-events-none absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-500" />
+            <Search className="pointer-events-none absolute left-2.5 top-2 h-3.5 w-3.5 text-zinc-500" />
             <input
               type="text"
               placeholder="Filter address, hood, zip..."
               value={knobs.search_query}
               onChange={(e) => setKnobs({ ...knobs, search_query: e.target.value })}
-              className="w-48 rounded-lg border border-slate-800 bg-slate-900 py-1.5 pl-8 pr-3 text-xs text-slate-100 placeholder:text-slate-500 focus:border-sky-500 focus:outline-none"
+              className="w-48 rounded-lg border border-zinc-800 bg-zinc-900 py-1.5 pl-8 pr-3 text-xs text-zinc-100 placeholder:text-zinc-500 focus:border-blue-500 focus:outline-none"
             />
           </div>
 
-          <div className="flex rounded-lg border border-slate-800 bg-slate-900 p-0.5 text-xs">
+          <div className="flex rounded-lg border border-zinc-800 bg-zinc-900 p-0.5 text-xs">
             <button
               onClick={() => setTab("map")}
               className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 font-medium ${
-                tab === "map" ? "bg-slate-800 text-slate-100" : "text-slate-400 hover:text-slate-200"
+                tab === "map" ? "bg-zinc-800 text-zinc-100" : "text-zinc-400 hover:text-zinc-200"
               }`}
             >
               <MapIcon className="h-3.5 w-3.5" /> Map &amp; List
@@ -212,7 +221,7 @@ export function App() {
             <button
               onClick={() => setTab("analytics")}
               className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 font-medium ${
-                tab === "analytics" ? "bg-slate-800 text-slate-100" : "text-slate-400 hover:text-slate-200"
+                tab === "analytics" ? "bg-zinc-800 text-zinc-100" : "text-zinc-400 hover:text-zinc-200"
               }`}
             >
               <BarChart3 className="h-3.5 w-3.5" /> Analytics
@@ -222,7 +231,7 @@ export function App() {
           <button
             onClick={handlePoll}
             disabled={polling}
-            className="flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-emerald-400 disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-lg bg-zinc-100 px-3 py-1.5 text-xs font-semibold text-zinc-950 hover:bg-white disabled:opacity-50"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${polling ? "animate-spin" : ""}`} />
             {polling ? "Polling..." : "Poll Live"}
@@ -233,7 +242,21 @@ export function App() {
       {/* Body */}
       <div className="flex min-h-0 flex-1">
         {showSidebar && (
-          <KnobSidebar knobs={knobs} onChange={setKnobs} onReset={() => setKnobs(baseKnobs)} />
+          <>
+            <KnobSidebar
+              knobs={knobs}
+              onChange={setKnobs}
+              onReset={() => setKnobs(baseKnobs)}
+              width={leftSidebarWidth}
+            />
+            <div
+              onMouseDown={() => setDragTarget("left")}
+              className={`w-1.5 shrink-0 cursor-col-resize transition ${
+                dragTarget === "left" ? "bg-blue-500/50" : "hover:bg-zinc-700/60"
+              }`}
+              title="Drag to resize knobs sidebar"
+            />
+          </>
         )}
 
         <main className="flex min-w-0 flex-1 flex-col">
@@ -252,9 +275,9 @@ export function App() {
               {showRightPanel && (
                 <>
                   <div
-                    onMouseDown={() => setIsDragging(true)}
+                    onMouseDown={() => setDragTarget("right")}
                     className={`hidden w-3 shrink-0 cursor-col-resize items-center justify-center lg:flex ${
-                      isDragging ? "text-emerald-400" : "text-slate-600 hover:text-slate-300"
+                      dragTarget === "right" ? "text-blue-400" : "text-zinc-600 hover:text-zinc-300"
                     }`}
                     title="Drag to resize listings panel"
                   >
@@ -262,15 +285,15 @@ export function App() {
                   </div>
                   <div
                     style={{ width: `${rightPanelWidth}px` }}
-                    className="mt-3 flex min-h-0 shrink-0 flex-col overflow-hidden rounded-xl border border-slate-800 bg-slate-950 lg:mt-0"
+                    className="mt-3 flex min-h-0 shrink-0 flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 lg:mt-0"
                   >
-                <div className="flex items-center justify-between border-b border-slate-800 px-3 py-2 text-xs text-slate-400">
+                <div className="flex items-center justify-between border-b border-zinc-800 px-3 py-2 text-xs text-zinc-400">
                   <span>
                     {loading ? "Updating..." : `${listings.length} listings ranked by score`}
                   </span>
-                  <span className="text-[11px] text-slate-500">Click card to fly &amp; inspect</span>
+                  <span className="text-[11px] text-zinc-500">Click card to inspect</span>
                 </div>
-                <div className="flex-1 divide-y divide-slate-800/80 overflow-y-auto">
+                <div className="flex-1 divide-y divide-zinc-800/80 overflow-y-auto">
                   {listings.map((item: ScoredListing) => {
                     const { listing: l, costs: c } = item;
                     const active = item.id === selectedId;
@@ -280,56 +303,64 @@ export function App() {
                         key={item.id}
                         onClick={() => setSelectedId(item.id)}
                         className={`cursor-pointer p-3 transition ${
-                          active ? "bg-slate-800/70" : "hover:bg-slate-900/80"
-                        } ${!item.passes_filters ? "opacity-65" : ""}`}
+                          active ? "bg-zinc-800/70" : "hover:bg-zinc-900/80"
+                        } ${!item.passes_filters ? "opacity-60" : ""}`}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
-                            <div className="truncate text-xs font-semibold text-slate-100">
+                            <div className="truncate text-xs font-semibold text-zinc-100">
                               {l.address} {l.unit ? `#${l.unit}` : ""}
                             </div>
-                            <div className="text-[11px] text-slate-400">
+                            <div className="text-[11px] text-zinc-400">
                               {l.neighborhood || l.borough} •{" "}
                               <span className="uppercase">{l.property_type}</span> • {l.beds}bd/{l.baths}ba
                               {l.sqft ? ` • ${l.sqft.toLocaleString()} sqft` : ""}
                             </div>
                           </div>
                           <div className="shrink-0 text-right">
-                            <div className="text-sm font-bold text-emerald-400">
+                            <div className="text-sm font-semibold text-zinc-50">
                               ${Math.round(c.rentable_units > 0 && knobs.use_net_rental_for_filter ? c.net_monthly_cost : c.total_monthly_cost).toLocaleString()}
-                              <span className="text-[10px] font-normal text-slate-400">
+                              <span className="text-[10px] font-normal text-zinc-400">
                                 {c.rentable_units > 0 && knobs.use_net_rental_for_filter ? "/mo net" : "/mo"}
                               </span>
                             </div>
-                            <div className="text-[11px] text-slate-400">
+                            <div className="text-[11px] text-zinc-400">
                               ${Math.round(l.price).toLocaleString()}
                             </div>
                           </div>
                         </div>
 
                         <div className="mt-2 flex items-center justify-between text-[11px]">
-                          <div className="flex items-center gap-2">
-                            <span className="rounded bg-sky-500/15 px-1.5 py-0.5 font-semibold text-sky-300">
-                              Score {item.score.toFixed(1)}
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="rounded bg-blue-500/15 px-1.5 py-0.5 font-medium text-blue-300">
+                              {item.score.toFixed(1)}
                             </span>
+                            {item.commute_minutes != null && (
+                              <span
+                                className="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-300"
+                                title={item.nearest_station ? `Via ${item.nearest_station}` : "To Midtown"}
+                              >
+                                {item.commute_mode === "walk" ? "🚶" : "🚇"} {item.commute_minutes}m
+                              </span>
+                            )}
                             {c.rentable_units > 0 && (
-                              <span className="rounded bg-violet-500/20 px-1.5 py-0.5 font-semibold text-violet-300">
-                                {c.num_units} Units (−${Math.round(c.estimated_net_rental_income / 1000 * 10) / 10}k rent)
+                              <span className="rounded bg-indigo-500/15 px-1.5 py-0.5 font-medium text-indigo-300">
+                                {c.num_units}U (−${Math.round((c.estimated_net_rental_income / 1000) * 10) / 10}k)
                               </span>
                             )}
                             {c.dti_pct != null && (
                               <span
                                 className={`rounded px-1.5 py-0.5 ${
                                   c.dti_pct <= 28
-                                    ? "bg-emerald-500/15 text-emerald-300"
-                                    : "bg-amber-500/15 text-amber-300"
+                                    ? "bg-teal-500/12 text-teal-300"
+                                    : "bg-zinc-800 text-zinc-300"
                                 }`}
                               >
                                 {c.dti_pct}% DTI
                               </span>
                             )}
-                            <span className="text-slate-500">
-                              Fees+Tax ${Math.round(c.monthly_hoa_or_maint + c.monthly_tax).toLocaleString()}
+                            <span className="text-zinc-500">
+                              Fees ${Math.round(c.monthly_hoa_or_maint + c.monthly_tax).toLocaleString()}
                             </span>
                           </div>
                           <button
@@ -338,7 +369,7 @@ export function App() {
                               togglePin(item.id);
                             }}
                             className={`rounded p-1 ${
-                              pinned ? "text-amber-400" : "text-slate-500 hover:text-slate-300"
+                              pinned ? "text-blue-400" : "text-zinc-500 hover:text-zinc-300"
                             }`}
                             title="Pin to Compare"
                           >

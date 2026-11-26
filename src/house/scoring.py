@@ -8,6 +8,7 @@ from house.config import BudgetConfig, SearchConfig
 from house.db import Database, Listing
 from house.finance import calculate_cost_breakdown
 from house.models import ListingData, ScoredListing
+from house.transit import estimate_midtown_commute
 
 
 def _clamp01(val: float) -> float:
@@ -97,11 +98,35 @@ def score_listing(
     if search.min_sqft > 0 and listing.sqft is not None and listing.sqft < search.min_sqft:
         rejections.append(f"Sqft {listing.sqft} < min {search.min_sqft}")
 
-    # 4. Required amenities
+    # 4. Required amenities & commute cap
     listing_amenities = {a.lower() for a in listing.amenities}
     for req in search.required_amenities:
         if req.lower() not in listing_amenities:
             rejections.append(f"Missing required amenity: {req}")
+
+    commute = estimate_midtown_commute(listing.latitude, listing.longitude)
+    if (
+        search.max_commute_minutes is not None
+        and commute is not None
+        and commute.minutes > search.max_commute_minutes
+    ):
+        rejections.append(
+            f"Commute {commute.minutes}m to Midtown > max {search.max_commute_minutes}m"
+        )
+
+    is_nj = (
+        listing.borough.lower() in ("jersey city", "hoboken")
+        or (listing.zip_code or "").startswith("07")
+    )
+    if (
+        is_nj
+        and search.nj_max_walk_to_path_min is not None
+        and commute is not None
+        and commute.walk_to_station_min > search.nj_max_walk_to_path_min
+    ):
+        rejections.append(
+            f"Walk to PATH {commute.walk_to_station_min}m > max {search.nj_max_walk_to_path_min}m"
+        )
 
     # ---- Composite Score (0 - 100) ----
 
@@ -146,9 +171,16 @@ def score_listing(
         excess = costs.monthly_fees_ratio - budget.max_monthly_fees_ratio
         fees_penalty = min(15.0, excess * 100.0 * 0.75)
 
+    # Commute to Midtown score: 1.0 at <= 15 min, 0.0 at >= 50 min
+    if commute is not None:
+        commute_score = _clamp01((50.0 - commute.minutes) / 35.0)
+    else:
+        commute_score = 0.5
+
     components = {
         "monthly_headroom": round(headroom_score * 100.0, 1),
         "price_per_sqft": round(ppsf_score * 100.0, 1),
+        "commute": round(commute_score * 100.0, 1),
         "size_fit": round(size_score * 100.0, 1),
         "amenities": round(amenities_score * 100.0, 1),
         "price_drop": round(price_drop_score * 100.0, 1),
@@ -173,6 +205,11 @@ def score_listing(
         price_drop_pct=round(price_drop_pct, 2),
         initial_price=initial_price,
         sources=sources or [listing.source],
+        commute_minutes=commute.minutes if commute else None,
+        commute_mode=commute.mode if commute else "",
+        nearest_station=commute.nearest_station if commute else "",
+        nearest_routes=list(commute.nearest_routes) if commute else [],
+        walk_to_station_min=commute.walk_to_station_min if commute else None,
     )
 
 

@@ -58,6 +58,8 @@ class SearchConfig:
     min_beds: float = 1.0
     min_baths: float = 1.0
     min_sqft: int = 0
+    max_commute_minutes: int | None = None
+    nj_max_walk_to_path_min: int | None = 15
     preferred_amenities: list[str] = field(default_factory=list)
     required_amenities: list[str] = field(default_factory=list)
     min_score_to_notify: float = 55.0
@@ -65,11 +67,12 @@ class SearchConfig:
     target_price_per_sqft: float = 1400.0
     weights: dict[str, float] = field(
         default_factory=lambda: {
-            "monthly_headroom": 0.35,
-            "price_per_sqft": 0.25,
+            "monthly_headroom": 0.30,
+            "price_per_sqft": 0.20,
+            "commute": 0.15,
             "size_fit": 0.15,
-            "amenities": 0.15,
-            "price_drop": 0.10,
+            "amenities": 0.12,
+            "price_drop": 0.08,
         }
     )
 
