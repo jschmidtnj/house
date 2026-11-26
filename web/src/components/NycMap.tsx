@@ -355,14 +355,21 @@ export function NycMap({
     }
   }, [listings, selectedId, onSelect, zoom]);
 
+  const lastFlownIdRef = useRef<number | null>(null);
+
   useEffect(() => {
-    if (!selectedId || !mapRef.current) return;
+    if (!selectedId || !mapRef.current) {
+      lastFlownIdRef.current = null;
+      return;
+    }
+    if (lastFlownIdRef.current === selectedId) return;
     const target = listings.find((l) => l.id === selectedId);
     if (target?.listing.latitude != null && target?.listing.longitude != null) {
+      lastFlownIdRef.current = selectedId;
       mapRef.current.flyTo(
         [target.listing.latitude, target.listing.longitude],
         Math.max(mapRef.current.getZoom(), MAP_CONFIG.flyToListingMinZoom),
-        { duration: 0.55 }
+        { duration: 0.45 }
       );
     }
   }, [selectedId, listings]);

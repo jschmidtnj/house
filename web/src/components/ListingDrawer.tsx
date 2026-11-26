@@ -8,6 +8,7 @@ import {
   FolderPlus,
   Heart,
   Link2,
+  MapPin,
   Maximize2,
   Minimize2,
   Plus,
@@ -31,6 +32,7 @@ import { HoverTip, InfoTip } from "./InfoTip";
 interface ListingDrawerProps {
   item: ScoredListing | null;
   onClose: () => void;
+  onShowOnMap?: () => void;
   isPinned: boolean;
   onTogglePin: (id: number) => void;
   isSaved: boolean;
@@ -45,6 +47,7 @@ interface ListingDrawerProps {
 export function ListingDrawer({
   item,
   onClose,
+  onShowOnMap,
   isPinned,
   onTogglePin,
   isSaved,
@@ -145,6 +148,16 @@ export function ListingDrawer({
             {isHidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
             <span className="hidden sm:inline">{isHidden ? "Hidden" : "Hide"}</span>
           </button>
+          {onShowOnMap && item.listing.latitude != null && item.listing.longitude != null && (
+            <button
+              onClick={onShowOnMap}
+              className="flex items-center gap-1 rounded-lg border border-zinc-800 px-2 py-1 text-xs font-medium text-zinc-300 transition hover:border-zinc-700 hover:text-zinc-100"
+              title="Focus this listing on the map"
+            >
+              <MapPin className="h-3.5 w-3.5 text-blue-400" />
+              <span className="hidden sm:inline">Map</span>
+            </button>
+          )}
           <button
             onClick={() => {
               const url = new URL(window.location.href);

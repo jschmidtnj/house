@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 
-export function useLists() {
+export function useLists(initialActiveList: string | null = null) {
   const [savedIds, setSavedIds] = useState<number[]>([]);
   const [hiddenIds, setHiddenIds] = useState<number[]>([]);
   const [customLists, setCustomLists] = useState<Record<string, number[]>>({});
-  const [activeList, setActiveList] = useState<string | null>(null);
+  const [activeList, setActiveList] = useState<string | null>(initialActiveList);
 
   useEffect(() => {
     fetch("/api/saved")

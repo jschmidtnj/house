@@ -10,6 +10,7 @@ import { TopHeader } from "./components/TopHeader";
 import { DEFAULT_KNOBS, UI_CONFIG } from "./config";
 import { useLists } from "./hooks/useLists";
 import type { ConfigResponse, KnobsState, RankResponse, ScoredListing } from "./types";
+import { applyUrlKnobs, buildUrlSearch, parseUrlUiState } from "./utils/urlState";
 
 function getSystemTheme(): "dark" | "light" {
   if (typeof window === "undefined" || !window.matchMedia) return "dark";
@@ -17,6 +18,11 @@ function getSystemTheme(): "dark" | "light" {
 }
 
 export function App() {
+  const initialSearchRef = useRef<string>(
+    typeof window !== "undefined" ? window.location.search : ""
+  );
+  const initialUrlUi = useMemo(() => parseUrlUiState(initialSearchRef.current), []);
+
   const [theme, setTheme] = useState<"dark" | "light">(() => {
     if (typeof window === "undefined") return "dark";
     const saved = window.localStorage.getItem(UI_CONFIG.themeStorageKey);
@@ -26,23 +32,24 @@ export function App() {
   const [isDesktop, setIsDesktop] = useState<boolean>(() =>
     typeof window !== "undefined" ? window.innerWidth >= UI_CONFIG.desktopBreakpointPx : true
   );
+  const [configLoaded, setConfigLoaded] = useState(false);
   const [baseKnobs, setBaseKnobs] = useState<KnobsState>(DEFAULT_KNOBS);
-  const [knobs, setKnobs] = useState<KnobsState>(DEFAULT_KNOBS);
+  const [knobs, setKnobs] = useState<KnobsState>(() =>
+    applyUrlKnobs(DEFAULT_KNOBS, initialSearchRef.current)
+  );
   const [targetNeighborhoods, setTargetNeighborhoods] = useState<string[]>([]);
   const [rankData, setRankData] = useState<RankResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [polling, setPolling] = useState(false);
-  const [tab, setTab] = useState<"map" | "analytics">("map");
+  const [tab, setTab] = useState<"map" | "analytics">(initialUrlUi.tab);
   const [mobilePane, setMobilePane] = useState<"map" | "list">("map");
-  const [selectedId, setSelectedId] = useState<number | null>(() => {
-    if (typeof window === "undefined") return null;
-    const raw = new URLSearchParams(window.location.search).get("listing");
-    const parsed = raw ? Number(raw) : NaN;
-    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
-  });
+  const [selectedId, setSelectedId] = useState<number | null>(initialUrlUi.selectedId);
+  const [focusedId, setFocusedId] = useState<number | null>(initialUrlUi.selectedId);
   const [directListing, setDirectListing] = useState<ScoredListing | null>(null);
-  const [selectedBoroughs, setSelectedBoroughs] = useState<string[]>([]);
-  const [selectedNeighborhoods, setSelectedNeighborhoods] = useState<string[]>([]);
+  const [selectedBoroughs, setSelectedBoroughs] = useState<string[]>(initialUrlUi.selectedBoroughs);
+  const [selectedNeighborhoods, setSelectedNeighborhoods] = useState<string[]>(
+    initialUrlUi.selectedNeighborhoods
+  );
   const [pinnedIds, setPinnedIds] = useState<number[]>([]);
   const [leftSidebarWidth, setLeftSidebarWidth] = useState<number>(UI_CONFIG.leftSidebar.defaultWidth);
   const [rightPanelWidth, setRightPanelWidth] = useState<number>(UI_CONFIG.rightPanel.defaultWidth);
@@ -64,7 +71,12 @@ export function App() {
     createCustomList,
     toggleInCustomList,
     deleteCustomList,
-  } = useLists();
+  } = useLists(initialUrlUi.activeList);
+
+  const selectListing = useCallback((id: number) => {
+    setSelectedId(id);
+    setFocusedId(id);
+  }, []);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -153,21 +165,27 @@ export function App() {
           search_query: "",
         };
         setBaseKnobs(loaded);
-        setKnobs(loaded);
+        setKnobs(applyUrlKnobs(loaded, initialSearchRef.current));
         setTargetNeighborhoods(cfg.search.neighborhoods ?? []);
+        setConfigLoaded(true);
       })
-      .catch(() => {});
+      .catch(() => {
+        setConfigLoaded(true);
+      });
   }, []);
 
   useEffect(() => {
+    if (!configLoaded) return;
     const url = new URL(window.location.href);
-    if (selectedId != null) {
-      url.searchParams.set("listing", String(selectedId));
-    } else {
-      url.searchParams.delete("listing");
-    }
-    window.history.replaceState(null, "", url.pathname + url.search + url.hash);
-  }, [selectedId]);
+    const nextSearch = buildUrlSearch(knobs, baseKnobs, {
+      selectedId,
+      activeList,
+      selectedBoroughs,
+      selectedNeighborhoods,
+      tab,
+    });
+    window.history.replaceState(null, "", url.pathname + nextSearch + url.hash);
+  }, [configLoaded, knobs, baseKnobs, selectedId, activeList, selectedBoroughs, selectedNeighborhoods, tab]);
 
   const fetchRanked = useCallback(async (state: KnobsState) => {
     setLoading(true);
@@ -315,8 +333,9 @@ export function App() {
   const handleToggleHide = (id: number) => {
     const willHide = !hiddenIds.includes(id);
     toggleHide(id);
-    if (willHide && activeList !== "__hidden__" && selectedId === id) {
-      setSelectedId(null);
+    if (willHide && activeList !== "__hidden__") {
+      if (selectedId === id) setSelectedId(null);
+      if (focusedId === id) setFocusedId(null);
     }
   };
 
@@ -350,14 +369,14 @@ export function App() {
       loading={loading}
       isDesktop={isDesktop}
       rightPanelWidth={rightPanelWidth}
-      selectedId={selectedId}
+      selectedId={selectedId ?? focusedId}
       savedIds={savedIds}
       hiddenIds={hiddenIds}
       pinnedIds={pinnedIds}
       useNetRental={knobs.use_net_rental_for_filter}
       searchQuery={knobs.search_query}
       onSearchChange={(q) => setKnobs({ ...knobs, search_query: q })}
-      onSelectListing={(item) => setSelectedId(item.id)}
+      onSelectListing={(item) => selectListing(item.id)}
       onSelectNeighborhood={addNeighborhood}
       onToggleSave={toggleSave}
       onToggleHide={handleToggleHide}
@@ -378,7 +397,7 @@ export function App() {
         allListings={allListings}
         searchQuery={knobs.search_query}
         onSearchChange={(q) => setKnobs({ ...knobs, search_query: q })}
-        onSelectListing={(item) => setSelectedId(item.id)}
+        onSelectListing={(item) => selectListing(item.id)}
         onSelectNeighborhood={addNeighborhood}
         savedCount={savedIds.length}
         activeList={activeList}
@@ -442,8 +461,8 @@ export function App() {
                 <div className="min-h-0 min-w-0 flex-1">
                   <NycMap
                     listings={listings}
-                    selectedId={selectedId}
-                    onSelect={(item) => setSelectedId(item.id)}
+                    selectedId={selectedId ?? focusedId}
+                    onSelect={(item) => selectListing(item.id)}
                     theme={theme}
                     targetNeighborhoods={targetNeighborhoods}
                   />
@@ -469,8 +488,8 @@ export function App() {
                   <div className="min-h-0 flex-1">
                     <NycMap
                       listings={listings}
-                      selectedId={selectedId}
-                      onSelect={(item) => setSelectedId(item.id)}
+                      selectedId={selectedId ?? focusedId}
+                      onSelect={(item) => selectListing(item.id)}
                       theme={theme}
                       targetNeighborhoods={targetNeighborhoods}
                     />
@@ -484,7 +503,7 @@ export function App() {
             <AnalyticsView
               listings={listings}
               maxMonthlyCost={knobs.max_monthly_cost}
-              onSelect={(item) => setSelectedId(item.id)}
+              onSelect={(item) => selectListing(item.id)}
             />
           )}
 
@@ -492,7 +511,7 @@ export function App() {
             items={pinnedItems}
             onRemove={(id) => setPinnedIds((p) => p.filter((x) => x !== id))}
             onClear={() => setPinnedIds([])}
-            onSelect={(item) => setSelectedId(item.id)}
+            onSelect={(item) => selectListing(item.id)}
           />
         </main>
       </div>
@@ -500,6 +519,12 @@ export function App() {
       <ListingDrawer
         item={selectedItem}
         onClose={() => setSelectedId(null)}
+        onShowOnMap={() => {
+          if (selectedId != null) setFocusedId(selectedId);
+          setSelectedId(null);
+          setTab("map");
+          setMobilePane("map");
+        }}
         isPinned={selectedId != null && pinnedIds.includes(selectedId)}
         onTogglePin={togglePin}
         isSaved={selectedId != null && savedIds.includes(selectedId)}
