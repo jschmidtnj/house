@@ -1,42 +1,18 @@
+import { MTA_COLORS, SCORE_TIERS } from "../config";
 import type { ScoredListing } from "../types";
 
-export const MTA_COLORS: Record<string, { bg: string; fg: string }> = {
-  A: { bg: "#2850AD", fg: "#fff" },
-  C: { bg: "#2850AD", fg: "#fff" },
-  E: { bg: "#2850AD", fg: "#fff" },
-  B: { bg: "#FF6319", fg: "#fff" },
-  D: { bg: "#FF6319", fg: "#fff" },
-  F: { bg: "#FF6319", fg: "#fff" },
-  M: { bg: "#FF6319", fg: "#fff" },
-  G: { bg: "#6CBE45", fg: "#fff" },
-  J: { bg: "#996633", fg: "#fff" },
-  Z: { bg: "#996633", fg: "#fff" },
-  L: { bg: "#A7A9AC", fg: "#0f172a" },
-  N: { bg: "#FCCC0A", fg: "#0f172a" },
-  Q: { bg: "#FCCC0A", fg: "#0f172a" },
-  R: { bg: "#FCCC0A", fg: "#0f172a" },
-  W: { bg: "#FCCC0A", fg: "#0f172a" },
-  "1": { bg: "#EE352E", fg: "#fff" },
-  "2": { bg: "#EE352E", fg: "#fff" },
-  "3": { bg: "#EE352E", fg: "#fff" },
-  "4": { bg: "#00933C", fg: "#fff" },
-  "5": { bg: "#00933C", fg: "#fff" },
-  "6": { bg: "#00933C", fg: "#fff" },
-  "7": { bg: "#B933AD", fg: "#fff" },
-  S: { bg: "#808183", fg: "#fff" },
-  PATH: { bg: "#0078C8", fg: "#fff" },
-};
+export { MTA_COLORS };
 
 export function formatShortMonthly(val: number): string {
   return `$${(val / 1000).toFixed(1)}k`;
 }
 
 export function pinColors(item: ScoredListing, isSelected: boolean): { bg: string; fg: string } {
-  if (isSelected) return { bg: "#fafafa", fg: "#09090b" };
-  if (!item.passes_filters) return { bg: "#3f3f46", fg: "#d4d4d8" };
-  if (item.score >= 65) return { bg: "#2dd4bf", fg: "#09090b" };
-  if (item.score >= 50) return { bg: "#60a5fa", fg: "#09090b" };
-  return { bg: "#a1a1aa", fg: "#09090b" };
+  if (isSelected) return SCORE_TIERS.colors.selected;
+  if (!item.passes_filters) return SCORE_TIERS.colors.rejected;
+  if (item.score >= SCORE_TIERS.topMin) return SCORE_TIERS.colors.top;
+  if (item.score >= SCORE_TIERS.goodMin) return SCORE_TIERS.colors.good;
+  return SCORE_TIERS.colors.match;
 }
 
 export function createListingPinElement(item: ScoredListing, isSelected: boolean): HTMLElement {

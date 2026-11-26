@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Folder, Heart, Plus, RotateCcw, Sliders, Trash2, X } from "lucide-react";
+import { PROPERTY_TYPES } from "../config";
 import type { KnobsState } from "../types";
 import { InfoTip } from "./InfoTip";
 
@@ -25,7 +26,7 @@ interface KnobSidebarProps {
   onClearLocations: () => void;
 }
 
-const ALL_TYPES = ["condo", "coop", "condop", "townhouse", "multifamily"];
+const ALL_TYPES: readonly string[] = PROPERTY_TYPES;
 
 export function KnobSidebar({
   knobs,

@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import { Layers, Map as MapIcon, TrainFront } from "lucide-react";
+import { MAP_CONFIG, MTA_COLORS, SCORE_TIERS, type BasemapStyle } from "../config";
 import type { ScoredListing } from "../types";
 import {
-  MTA_COLORS,
   createClusterPinElement,
   createClusterTooltipElement,
   createListingPinElement,
@@ -16,9 +16,8 @@ interface NycMapProps {
   selectedId: number | null;
   onSelect: (item: ScoredListing) => void;
   theme?: "dark" | "light";
+  targetNeighborhoods?: string[];
 }
-
-type BasemapStyle = "dark" | "light" | "streets";
 
 interface SubwayStation {
   name: string;
@@ -28,88 +27,19 @@ interface SubwayStation {
   lng: number;
 }
 
-const BASEMAPS: Record<BasemapStyle, { label: string; urls: string[]; attribution: string }> = {
-  dark: {
-    label: "Clean Dark",
-    urls: [
-      "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
-      "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}",
-    ],
-    attribution: "&copy; Esri, OpenStreetMap",
-  },
-  light: {
-    label: "Clean Light",
-    urls: [
-      "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}",
-      "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}",
-    ],
-    attribution: "&copy; Esri, OpenStreetMap",
-  },
-  streets: {
-    label: "Streets",
-    urls: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-    attribution: "&copy; OpenStreetMap contributors",
-  },
-};
-
-const TARGET_HOOD_KEYWORDS = [
-  "east village",
-  "lower east side",
-  "chinatown",
-  "two bridges",
-  "civic center",
-  "financial district",
-  "battery park",
-  "west village",
-  "greenwich village",
-  "chelsea",
-  "hudson yards",
-  "hell's kitchen",
-  "tribeca",
-  "soho",
-  "noho",
-  "nolita",
-  "little italy",
-  "gramercy",
-  "flatiron",
-  "kips bay",
-  "murray hill",
-  "midtown",
-  "turtle bay",
-  "sutton place",
-  "williamsburg",
-  "greenpoint",
-  "dumbo",
-  "vinegar hill",
-  "navy yard",
-  "downtown brooklyn",
-  "bedford-stuyvesant",
-  "bushwick",
-  "fort greene",
-  "clinton hill",
-  "boerum hill",
-  "cobble hill",
-  "carroll gardens",
-  "columbia st",
-  "red hook",
-  "brooklyn heights",
-  "long island city",
-  "hunters point",
-  "astoria",
-];
-
-function isTargetHood(name: string): boolean {
-  const lower = name.toLowerCase();
-  return TARGET_HOOD_KEYWORDS.some((kw) => lower.includes(kw));
-}
-
 function shortHoodLabel(name: string): string {
   const parts = name.split("-").map((s) => s.trim());
   if (parts.length <= 2) return name;
   return `${parts[0]} / ${parts[1]}`;
 }
 
-export function NycMap({ listings, selectedId, onSelect, theme = "dark" }: NycMapProps) {
+export function NycMap({
+  listings,
+  selectedId,
+  onSelect,
+  theme = "dark",
+  targetNeighborhoods = [],
+}: NycMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const tileGroupRef = useRef<L.LayerGroup | null>(null);
@@ -121,29 +51,39 @@ export function NycMap({ listings, selectedId, onSelect, theme = "dark" }: NycMa
   const [showStreets, setShowStreets] = useState(false);
   const [showHoods, setShowHoods] = useState(true);
   const [showSubways, setShowSubways] = useState(true);
-  const [zoom, setZoom] = useState<number>(12);
+  const [zoom, setZoom] = useState<number>(MAP_CONFIG.initialZoom);
   const [hoodGeo, setHoodGeo] = useState<GeoJSON.FeatureCollection | null>(null);
   const [subwayLinesGeo, setSubwayLinesGeo] = useState<GeoJSON.FeatureCollection | null>(null);
   const [subways, setSubways] = useState<SubwayStation[]>([]);
 
   const style: BasemapStyle = showStreets ? "streets" : theme;
 
+  const targetKeywords = useMemo(
+    () => targetNeighborhoods.map((n) => n.trim().toLowerCase()).filter(Boolean),
+    [targetNeighborhoods]
+  );
+
+  const isTargetHood = (name: string): boolean => {
+    const lower = name.toLowerCase();
+    return targetKeywords.some((kw) => lower.includes(kw) || kw.includes(lower));
+  };
+
   useEffect(() => {
-    fetch("/data/nyc_neighborhoods.geojson?v=2")
+    fetch(MAP_CONFIG.dataUrls.neighborhoods)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (d) setHoodGeo(d);
       })
       .catch(() => {});
 
-    fetch("/data/nyc_subway_lines.geojson")
+    fetch(MAP_CONFIG.dataUrls.subwayLines)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (d) setSubwayLinesGeo(d);
       })
       .catch(() => {});
 
-    fetch("/data/nyc_subways.json")
+    fetch(MAP_CONFIG.dataUrls.subways)
       .then((r) => (r.ok ? r.json() : []))
       .then((d) => {
         if (Array.isArray(d)) setSubways(d);
@@ -155,8 +95,8 @@ export function NycMap({ listings, selectedId, onSelect, theme = "dark" }: NycMa
     if (!containerRef.current || mapRef.current) return;
 
     const map = L.map(containerRef.current, {
-      center: [40.722, -73.975],
-      zoom: 12,
+      center: MAP_CONFIG.initialCenter,
+      zoom: MAP_CONFIG.initialZoom,
       zoomControl: false,
     });
 
@@ -199,23 +139,23 @@ export function NycMap({ listings, selectedId, onSelect, theme = "dark" }: NycMa
     const group = tileGroupRef.current;
     if (!group) return;
     group.clearLayers();
-    const cfg = BASEMAPS[style];
+    const cfg = MAP_CONFIG.basemaps[style];
     for (const url of cfg.urls) {
       L.tileLayer(url, {
         attribution: cfg.attribution,
-        maxZoom: 16,
+        maxZoom: MAP_CONFIG.maxTileZoom,
       }).addTo(group);
     }
   }, [style]);
 
-  // Neighborhood boundaries + labels (permanent labels hidden when zoomed out <= 11)
+  // Neighborhood boundaries + labels (permanent labels hidden when zoomed out)
   useEffect(() => {
     const group = hoodLayerRef.current;
     if (!group) return;
     group.clearLayers();
     if (!showHoods || !hoodGeo) return;
 
-    const showPermanentLabels = zoom >= 12;
+    const showPermanentLabels = zoom >= MAP_CONFIG.zoomThresholds.showPermanentHoodLabels;
 
     L.geoJSON(hoodGeo, {
       style: (feature) => {
@@ -248,7 +188,7 @@ export function NycMap({ listings, selectedId, onSelect, theme = "dark" }: NycMa
         }
       },
     }).addTo(group);
-  }, [showHoods, hoodGeo, zoom]);
+  }, [showHoods, hoodGeo, zoom, targetKeywords]);
 
   // MTA Subway & PATH track lines
   useEffect(() => {
@@ -263,21 +203,22 @@ export function NycMap({ listings, selectedId, onSelect, theme = "dark" }: NycMa
       style: (feature) => {
         const rt = String(feature?.properties?.route || "");
         const color = (MTA_COLORS[rt] || { bg: "#94a3b8" }).bg;
+        const zoomedOut = zoom < MAP_CONFIG.zoomThresholds.showSubwayDots;
         return {
           color,
-          weight: zoom <= 11 ? 1.8 : 2.4,
-          opacity: zoom <= 11 ? 0.45 : 0.62,
+          weight: zoomedOut ? 1.8 : 2.4,
+          opacity: zoomedOut ? 0.45 : 0.62,
         };
       },
     }).addTo(group);
   }, [showSubways, subwayLinesGeo, zoom]);
 
-  // MTA Subway & PATH station dots (hidden when zoomed far out <= 11)
+  // MTA Subway & PATH station dots (hidden when zoomed far out)
   useEffect(() => {
     const group = subwayLayerRef.current;
     if (!group) return;
     group.clearLayers();
-    if (!showSubways || subways.length === 0 || zoom <= 11) return;
+    if (!showSubways || subways.length === 0 || zoom < MAP_CONFIG.zoomThresholds.showSubwayDots) return;
 
     const canHover = window.matchMedia("(hover: hover)").matches;
     for (const st of subways) {
@@ -322,12 +263,13 @@ export function NycMap({ listings, selectedId, onSelect, theme = "dark" }: NycMa
       const isSelected = item.id === selectedId;
       const zIndex = isSelected ? 1000 : item.passes_filters ? Math.round(item.score * 5) : 10;
       const isMulti = item.costs.rentable_units > 0;
-      const pinWidth = isMulti ? 82 : 62;
+      const pinWidth = isMulti ? MAP_CONFIG.pinSizes.multiUnitWidth : MAP_CONFIG.pinSizes.singleWidth;
+      const pinHeight = MAP_CONFIG.pinSizes.height;
       const icon = L.divIcon({
         className: "house-pin",
         html: createListingPinElement(item, isSelected),
-        iconSize: [pinWidth, 24],
-        iconAnchor: [pinWidth / 2, 12],
+        iconSize: [pinWidth, pinHeight],
+        iconAnchor: [pinWidth / 2, pinHeight / 2],
       });
       const marker = L.marker([item.listing.latitude!, item.listing.longitude!], {
         icon,
@@ -341,14 +283,14 @@ export function NycMap({ listings, selectedId, onSelect, theme = "dark" }: NycMa
       marker.addTo(layer);
     };
 
-    if (zoom >= 14) {
+    if (zoom >= MAP_CONFIG.zoomThresholds.unclusterMinZoom) {
       for (const item of withCoords) addSingleMarker(item);
       return;
     }
 
-    // Aggressive pixel clustering at low zooms so pins never pile up
-    const cellPx = zoom <= 10 ? 110 : zoom === 11 ? 90 : zoom === 12 ? 76 : 56;
-    const compactCluster = zoom <= 11;
+    const { z10OrLess, z11, z12, z13 } = MAP_CONFIG.clusterCellPx;
+    const cellPx = zoom <= 10 ? z10OrLess : zoom === 11 ? z11 : zoom === 12 ? z12 : z13;
+    const compactCluster = zoom <= MAP_CONFIG.zoomThresholds.compactClustersMaxZoom;
     const buckets = new Map<string, ScoredListing[]>();
 
     for (const item of withCoords) {
@@ -376,13 +318,19 @@ export function NycMap({ listings, selectedId, onSelect, theme = "dark" }: NycMa
         )
       );
       const topScore = Math.max(...group.map((i) => i.score));
-      const accent = topScore >= 65 ? "#2dd4bf" : topScore >= 50 ? "#60a5fa" : "#a1a1aa";
+      const accent =
+        topScore >= SCORE_TIERS.topMin
+          ? SCORE_TIERS.colors.top.bg
+          : topScore >= SCORE_TIERS.goodMin
+          ? SCORE_TIERS.colors.good.bg
+          : SCORE_TIERS.colors.match.bg;
 
+      const { compactCluster: cSize, pillClusterWidth: pW, pillClusterHeight: pH } = MAP_CONFIG.pinSizes;
       const clusterIcon = L.divIcon({
         className: "house-pin",
         html: createClusterPinElement(group.length, minMonthly, accent, compactCluster),
-        iconSize: compactCluster ? [30, 30] : [86, 26],
-        iconAnchor: compactCluster ? [15, 15] : [43, 13],
+        iconSize: compactCluster ? [cSize, cSize] : [pW, pH],
+        iconAnchor: compactCluster ? [cSize / 2, cSize / 2] : [pW / 2, pH / 2],
       });
 
       const marker = L.marker([avgLat, avgLng], {
@@ -413,7 +361,7 @@ export function NycMap({ listings, selectedId, onSelect, theme = "dark" }: NycMa
     if (target?.listing.latitude != null && target?.listing.longitude != null) {
       mapRef.current.flyTo(
         [target.listing.latitude, target.listing.longitude],
-        Math.max(mapRef.current.getZoom(), 14),
+        Math.max(mapRef.current.getZoom(), MAP_CONFIG.flyToListingMinZoom),
         { duration: 0.55 }
       );
     }
@@ -462,13 +410,13 @@ export function NycMap({ listings, selectedId, onSelect, theme = "dark" }: NycMa
       {/* Legend */}
       <div className="pointer-events-none absolute bottom-3 left-3 z-[400] hidden items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-950/90 px-3 py-1.5 text-[11px] text-zinc-400 backdrop-blur sm:flex">
         <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-full bg-teal-400" /> Top (≥65)
+          <span className="h-2.5 w-2.5 rounded-full bg-teal-400" /> Top (≥{SCORE_TIERS.topMin})
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-full bg-blue-400" /> Good (50–64)
+          <span className="h-2.5 w-2.5 rounded-full bg-blue-400" /> Good ({SCORE_TIERS.goodMin}–{SCORE_TIERS.topMin - 1})
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-full bg-zinc-400" /> Match (&lt;50)
+          <span className="h-2.5 w-2.5 rounded-full bg-zinc-400" /> Match (&lt;{SCORE_TIERS.goodMin})
         </span>
         <span className="flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 rounded-full bg-zinc-600" /> Rejected

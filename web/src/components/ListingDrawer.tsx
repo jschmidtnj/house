@@ -10,6 +10,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { UI_CONFIG } from "../config";
 import type { ScoredListing } from "../types";
 import { HoverTip, InfoTip } from "./InfoTip";
 
@@ -36,7 +37,7 @@ export function ListingDrawer({
   onToggleInList,
   onCreateList,
 }: ListingDrawerProps) {
-  const [width, setWidth] = useState<number>(460);
+  const [width, setWidth] = useState<number>(UI_CONFIG.drawer.defaultWidth);
   const [dragging, setDragging] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
   const [newListName, setNewListName] = useState<string>("");
@@ -44,7 +45,10 @@ export function ListingDrawer({
   useEffect(() => {
     if (!dragging) return;
     const onMove = (e: MouseEvent) => {
-      const next = Math.max(360, Math.min(Math.round(window.innerWidth * 0.85), window.innerWidth - e.clientX));
+      const next = Math.max(
+        UI_CONFIG.drawer.minWidth,
+        Math.min(Math.round(window.innerWidth * 0.85), window.innerWidth - e.clientX)
+      );
       setWidth(next);
     };
     const onUp = () => setDragging(false);
@@ -62,7 +66,7 @@ export function ListingDrawer({
 
   if (!item) return null;
 
-  const isExpanded = width >= 680;
+  const isExpanded = width >= UI_CONFIG.drawer.expandedBreakpoint;
   const { listing: l, costs: c } = item;
   const total = c.total_monthly_cost || 1;
   const piPct = (c.monthly_mortgage_pi / total) * 100;
@@ -125,7 +129,13 @@ export function ListingDrawer({
             {copied ? <Check className="h-4 w-4 text-teal-400" /> : <Link2 className="h-4 w-4" />}
           </button>
           <button
-            onClick={() => setWidth(isExpanded ? 460 : Math.min(760, Math.round(window.innerWidth * 0.65)))}
+            onClick={() =>
+              setWidth(
+                isExpanded
+                  ? UI_CONFIG.drawer.defaultWidth
+                  : Math.min(UI_CONFIG.drawer.expandedTarget, Math.round(window.innerWidth * 0.65))
+              )
+            }
             className="hidden rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 sm:inline-flex"
             title={isExpanded ? "Compact width" : "Expand panel"}
           >

@@ -36,6 +36,13 @@ neighborhoods:
   - Midtown East
   - Turtle Bay
   - Sutton Place
+  - Upper East Side
+  - Lenox Hill
+  - Yorkville
+  - Carnegie Hill
+  - Upper West Side
+  - Lincoln Square
+  - Manhattan Valley
   - Alphabet City
   - Williamsburg
   - Greenpoint
@@ -95,9 +102,18 @@ zip_codes:
   - "10017"
   - "10018"
   - "10019"
+  - "10021"
   - "10022"
+  - "10023"
+  - "10024"
+  - "10025"
+  - "10028"
   - "10036"
   - "10038"
+  - "10065"
+  - "10069"
+  - "10075"
+  - "10128"
   - "10280"
   - "10282"
   - "11201"

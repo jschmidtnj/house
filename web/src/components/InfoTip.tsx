@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { HelpCircle } from "lucide-react";
+import { UI_CONFIG } from "../config";
 
 interface TipCoords {
   left: number;
@@ -102,7 +103,13 @@ interface HoverTipProps {
   style?: React.CSSProperties;
 }
 
-export function HoverTip({ text, children, delayMs = 100, className, style }: HoverTipProps) {
+export function HoverTip({
+  text,
+  children,
+  delayMs = UI_CONFIG.hoverTipDelayMs,
+  className,
+  style,
+}: HoverTipProps) {
   const [coords, setCoords] = useState<TipCoords | null>(null);
   const triggerRef = useRef<HTMLSpanElement | null>(null);
   const timerRef = useRef<number | null>(null);

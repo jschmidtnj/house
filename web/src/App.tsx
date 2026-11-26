@@ -7,35 +7,9 @@ import { ListingDrawer } from "./components/ListingDrawer";
 import { ListingsFeed } from "./components/ListingsFeed";
 import { NycMap } from "./components/NycMap";
 import { TopHeader } from "./components/TopHeader";
+import { DEFAULT_KNOBS, UI_CONFIG } from "./config";
 import { useLists } from "./hooks/useLists";
 import type { ConfigResponse, KnobsState, RankResponse, ScoredListing } from "./types";
-
-const DEFAULT_KNOBS: KnobsState = {
-  annual_income: 300000,
-  max_monthly_cost: 7000,
-  max_price: 2000000,
-  down_payment_pct: 20,
-  interest_rate_pct: 6.5,
-  loan_term_years: 30,
-  use_after_tax_for_filter: false,
-  est_rent_per_unit: 3200,
-  use_net_rental_for_filter: true,
-  current_monthly_rent: 5300,
-  hold_years: 7,
-  home_appreciation_pct: 3.0,
-  rent_growth_pct: 3.5,
-  investment_return_pct: 7.0,
-  min_units: 1,
-  min_beds: 1,
-  min_sqft: 600,
-  max_commute_minutes: 0,
-  nj_max_walk_to_path_min: 15,
-  property_types: ["condo", "coop", "condop", "townhouse", "multifamily"],
-  exclude_hdfc: true,
-  exclude_land_lease: false,
-  show_rejected: false,
-  search_query: "",
-};
 
 function getSystemTheme(): "dark" | "light" {
   if (typeof window === "undefined" || !window.matchMedia) return "dark";
@@ -45,15 +19,16 @@ function getSystemTheme(): "dark" | "light" {
 export function App() {
   const [theme, setTheme] = useState<"dark" | "light">(() => {
     if (typeof window === "undefined") return "dark";
-    const saved = window.localStorage.getItem("house-theme");
+    const saved = window.localStorage.getItem(UI_CONFIG.themeStorageKey);
     if (saved === "light" || saved === "dark") return saved;
     return getSystemTheme();
   });
   const [isDesktop, setIsDesktop] = useState<boolean>(() =>
-    typeof window !== "undefined" ? window.innerWidth >= 1024 : true
+    typeof window !== "undefined" ? window.innerWidth >= UI_CONFIG.desktopBreakpointPx : true
   );
   const [baseKnobs, setBaseKnobs] = useState<KnobsState>(DEFAULT_KNOBS);
   const [knobs, setKnobs] = useState<KnobsState>(DEFAULT_KNOBS);
+  const [targetNeighborhoods, setTargetNeighborhoods] = useState<string[]>([]);
   const [rankData, setRankData] = useState<RankResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [polling, setPolling] = useState(false);
@@ -69,10 +44,10 @@ export function App() {
   const [selectedBoroughs, setSelectedBoroughs] = useState<string[]>([]);
   const [selectedNeighborhoods, setSelectedNeighborhoods] = useState<string[]>([]);
   const [pinnedIds, setPinnedIds] = useState<number[]>([]);
-  const [leftSidebarWidth, setLeftSidebarWidth] = useState<number>(288);
-  const [rightPanelWidth, setRightPanelWidth] = useState<number>(400);
+  const [leftSidebarWidth, setLeftSidebarWidth] = useState<number>(UI_CONFIG.leftSidebar.defaultWidth);
+  const [rightPanelWidth, setRightPanelWidth] = useState<number>(UI_CONFIG.rightPanel.defaultWidth);
   const [showSidebar, setShowSidebar] = useState<boolean>(() =>
-    typeof window !== "undefined" ? window.innerWidth >= 1024 : true
+    typeof window !== "undefined" ? window.innerWidth >= UI_CONFIG.desktopBreakpointPx : true
   );
   const [showRightPanel, setShowRightPanel] = useState<boolean>(true);
   const [dragTarget, setDragTarget] = useState<"left" | "right" | null>(null);
@@ -99,7 +74,7 @@ export function App() {
     if (typeof window === "undefined" || !window.matchMedia) return;
     const mq = window.matchMedia("(prefers-color-scheme: light)");
     const onChange = (e: MediaQueryListEvent) => {
-      const saved = window.localStorage.getItem("house-theme");
+      const saved = window.localStorage.getItem(UI_CONFIG.themeStorageKey);
       if (saved !== "light" && saved !== "dark") {
         setTheme(e.matches ? "light" : "dark");
       }
@@ -109,7 +84,7 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    const onResize = () => setIsDesktop(window.innerWidth >= 1024);
+    const onResize = () => setIsDesktop(window.innerWidth >= UI_CONFIG.desktopBreakpointPx);
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
@@ -118,13 +93,18 @@ export function App() {
     if (!dragTarget) return;
     const onMove = (e: MouseEvent) => {
       if (dragTarget === "left") {
-        setLeftSidebarWidth(Math.max(240, Math.min(520, e.clientX)));
+        setLeftSidebarWidth(
+          Math.max(UI_CONFIG.leftSidebar.minWidth, Math.min(UI_CONFIG.leftSidebar.maxWidth, e.clientX))
+        );
         return;
       }
       const container = splitRef.current;
       if (!container) return;
       const rect = container.getBoundingClientRect();
-      const clamped = Math.max(240, Math.min(Math.round(rect.width * 0.65), rect.right - e.clientX));
+      const clamped = Math.max(
+        UI_CONFIG.rightPanel.minWidth,
+        Math.min(Math.round(rect.width * UI_CONFIG.rightPanel.maxViewportRatio), rect.right - e.clientX)
+      );
       setRightPanelWidth(clamped);
     };
     const onUp = () => setDragTarget(null);
@@ -172,6 +152,7 @@ export function App() {
         };
         setBaseKnobs(loaded);
         setKnobs(loaded);
+        setTargetNeighborhoods(cfg.search.neighborhoods ?? []);
       })
       .catch(() => {});
   }, []);
@@ -203,7 +184,7 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    const timer = setTimeout(() => fetchRanked(knobs), 120);
+    const timer = setTimeout(() => fetchRanked(knobs), UI_CONFIG.rankDebounceMs);
     return () => clearTimeout(timer);
   }, [knobs, fetchRanked]);
 
@@ -309,7 +290,11 @@ export function App() {
 
   const togglePin = (id: number) =>
     setPinnedIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : prev.length < 3 ? [...prev, id] : [...prev.slice(1), id]
+      prev.includes(id)
+        ? prev.filter((x) => x !== id)
+        : prev.length < UI_CONFIG.maxCompareItems
+        ? [...prev, id]
+        : [...prev.slice(1), id]
     );
 
   const resetAll = () => {
@@ -389,7 +374,7 @@ export function App() {
           setTheme((t) => {
             const next = t === "dark" ? "light" : "dark";
             try {
-              window.localStorage.setItem("house-theme", next);
+              window.localStorage.setItem(UI_CONFIG.themeStorageKey, next);
             } catch {
               // ignore storage errors
             }
@@ -440,6 +425,7 @@ export function App() {
                     selectedId={selectedId}
                     onSelect={(item) => setSelectedId(item.id)}
                     theme={theme}
+                    targetNeighborhoods={targetNeighborhoods}
                   />
                 </div>
                 {showRightPanel && (
@@ -466,6 +452,7 @@ export function App() {
                       selectedId={selectedId}
                       onSelect={(item) => setSelectedId(item.id)}
                       theme={theme}
+                      targetNeighborhoods={targetNeighborhoods}
                     />
                   </div>
                 ) : (
