@@ -17,7 +17,7 @@ from pydantic import BaseModel
 
 from house.config import AppConfig, load_config
 from house.db import Database
-from house.finance import calculate_cost_breakdown
+from house.finance import calculate_buy_vs_rent, calculate_cost_breakdown
 from house.models import ScoredListing
 from house.scoring import rank_listings
 from house.sources import poll_all_sources
@@ -41,6 +41,11 @@ class RankRequest(BaseModel):
     est_rent_per_unit: float | None = None
     rental_net_factor: float | None = None
     use_net_rental_for_filter: bool | None = None
+    current_monthly_rent: float | None = None
+    hold_years: int | None = None
+    home_appreciation_pct: float | None = None
+    rent_growth_pct: float | None = None
+    investment_return_pct: float | None = None
     min_beds: float | None = None
     min_baths: float | None = None
     min_sqft: int | None = None
@@ -57,10 +62,11 @@ class RankRequest(BaseModel):
     search_query: str = ""
 
 
-def _serialize_scored(item: ScoredListing) -> dict[str, Any]:
+def _serialize_scored(item: ScoredListing, budget: Any = None) -> dict[str, Any]:
     l = item.listing
     c = item.costs
     ppsf = round(l.price / l.sqft, 0) if l.sqft and l.sqft > 0 else None
+    bvr = asdict(calculate_buy_vs_rent(l, c, budget)) if budget is not None else None
     return {
         "id": item.listing_id,
         "canonical_key": item.canonical_key,
@@ -77,6 +83,7 @@ def _serialize_scored(item: ScoredListing) -> dict[str, Any]:
         "nearest_station": item.nearest_station,
         "nearest_routes": item.nearest_routes,
         "walk_to_station_min": item.walk_to_station_min,
+        "buy_vs_rent": bvr,
         "listing": {
             "address": l.address,
             "unit": l.unit,
@@ -129,6 +136,16 @@ def _apply_rank_request(base_cfg: AppConfig, req: RankRequest) -> AppConfig:
         cfg.budget.rental_net_factor = req.rental_net_factor
     if req.use_net_rental_for_filter is not None:
         cfg.budget.use_net_rental_for_filter = req.use_net_rental_for_filter
+    if req.current_monthly_rent is not None:
+        cfg.budget.current_monthly_rent = req.current_monthly_rent
+    if req.hold_years is not None:
+        cfg.budget.hold_years = req.hold_years
+    if req.home_appreciation_pct is not None:
+        cfg.budget.home_appreciation_pct = req.home_appreciation_pct
+    if req.rent_growth_pct is not None:
+        cfg.budget.rent_growth_pct = req.rent_growth_pct
+    if req.investment_return_pct is not None:
+        cfg.budget.investment_return_pct = req.investment_return_pct
 
     if req.min_beds is not None:
         cfg.search.min_beds = req.min_beds
@@ -228,7 +245,7 @@ def create_app(config_path: str | Path = "config/default.yaml") -> FastAPI:
                 "avg_monthly_cost": avg_monthly,
                 "avg_price": avg_price,
             },
-            "listings": [_serialize_scored(s) for s in scored],
+            "listings": [_serialize_scored(s, cfg.budget) for s in scored],
         }
 
     @app.get("/api/listings/{listing_id}")
@@ -243,7 +260,7 @@ def create_app(config_path: str | Path = "config/default.yaml") -> FastAPI:
         item = Database.to_listing_data(row)
         scored = rank_listings([row], cfg.budget, cfg.search, include_rejected=True)[0]
         return {
-            **_serialize_scored(scored),
+            **_serialize_scored(scored, cfg.budget),
             "price_history": [
                 {
                     "recorded_at": h.recorded_at,

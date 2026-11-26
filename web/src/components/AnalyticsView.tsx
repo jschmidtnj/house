@@ -80,12 +80,32 @@ export function AnalyticsView({ listings, maxMonthlyCost, onSelect }: AnalyticsV
               <ZAxis type="number" dataKey="sqft" range={[50, 260]} />
               <ReferenceLine x={maxMonthlyCost} stroke="#e4e4e7" strokeDasharray="4 4" />
               <Tooltip
-                cursor={{ strokeDasharray: "3 3" }}
-                contentStyle={{ backgroundColor: "#18181b", border: "1px solid #3f3f46", borderRadius: 8, fontSize: 12 }}
-                formatter={(val, name) =>
-                  name === "Monthly" ? [`$${Number(val).toLocaleString()}/mo`, name] : [val, name]
-                }
-                labelFormatter={(_, payload) => payload?.[0]?.payload?.name || ""}
+                cursor={{ strokeDasharray: "3 3", stroke: "#52525b" }}
+                content={({ active, payload }) => {
+                  if (!active || !payload || !payload.length) return null;
+                  const d = payload[0]?.payload;
+                  if (!d) return null;
+                  return (
+                    <div className="rounded-lg border border-zinc-700 bg-zinc-900/95 px-3 py-2 text-xs shadow-xl">
+                      <div className="font-semibold text-zinc-100">{d.name}</div>
+                      <div className="mb-1 text-[11px] text-zinc-400">
+                        {d.neighborhood} • <span className="uppercase">{d.type}</span>
+                      </div>
+                      <div className="space-y-0.5 text-[11px] text-zinc-300">
+                        <div>
+                          Monthly: <strong className="text-zinc-50">${Number(d.monthly).toLocaleString()}/mo</strong>
+                        </div>
+                        <div>
+                          Score: <strong className="text-blue-400">{d.score}</strong> • Price:{" "}
+                          <strong className="text-zinc-100">${Math.round(d.price / 1000)}k</strong>
+                        </div>
+                        <div>
+                          Size: <strong className="text-zinc-100">{d.sqft.toLocaleString()} sqft</strong>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }}
               />
               <Scatter
                 data={scatterData}
@@ -128,7 +148,16 @@ export function AnalyticsView({ listings, maxMonthlyCost, onSelect }: AnalyticsV
               <XAxis type="number" tickFormatter={(v) => `$${(v / 1000).toFixed(1)}k`} stroke="#a1a1aa" fontSize={11} />
               <YAxis type="category" dataKey="hood" width={110} stroke="#d4d4d8" fontSize={11} />
               <Tooltip
-                contentStyle={{ backgroundColor: "#18181b", border: "1px solid #3f3f46", borderRadius: 8, fontSize: 12 }}
+                cursor={{ fill: "rgba(255,255,255,0.04)" }}
+                contentStyle={{
+                  backgroundColor: "#18181b",
+                  border: "1px solid #3f3f46",
+                  borderRadius: 8,
+                  fontSize: 12,
+                  color: "#f4f4f5",
+                }}
+                labelStyle={{ color: "#fafafa", fontWeight: 600 }}
+                itemStyle={{ color: "#93c5fd" }}
                 formatter={(val) => [`$${Number(val).toLocaleString()}/mo`, "Avg Monthly"]}
               />
               <Bar dataKey="avgMonthly" fill="#60a5fa" radius={[0, 6, 6, 0]} />

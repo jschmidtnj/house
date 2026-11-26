@@ -1,6 +1,17 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, Check, ExternalLink, FolderPlus, Heart, Link2, Maximize2, Minimize2, Plus, Scale, X } from "lucide-react";
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import type { ScoredListing } from "../types";
+import { HoverTip, InfoTip } from "./InfoTip";
 
 interface ListingDrawerProps {
   item: ScoredListing | null;
@@ -183,7 +194,13 @@ export function ListingDrawer({
             </div>
           </div>
           <div className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-2.5">
-            <div className="text-[11px] text-zinc-400">Score / DTI</div>
+            <div className="flex items-center text-[11px] text-zinc-400">
+              Score / DTI
+              <InfoTip
+                align="right"
+                text="Score (0–100): weighted blend of monthly budget headroom (30%), $/sqft value (20%), Midtown commute (15%), size fit (15%), amenities (12%), and price drops (8%). DTI = gross monthly housing ÷ gross monthly income."
+              />
+            </div>
             <div className="text-base font-semibold text-blue-400">{item.score.toFixed(1)}</div>
             <div className="text-[10px] text-zinc-500">
               {c.dti_pct != null ? `${c.dti_pct}% gross DTI` : "DTI N/A"}
@@ -270,10 +287,36 @@ export function ListingDrawer({
         <div className="space-y-2 rounded-xl border border-zinc-800 bg-zinc-900/50 p-3">
           <div className="text-xs font-medium text-zinc-200">Monthly Cost Breakdown</div>
           <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-zinc-800">
-            <div style={{ width: `${piPct}%` }} className="bg-blue-400" title="Mortgage P&I" />
-            <div style={{ width: `${feePct}%` }} className="bg-indigo-400" title={feeLabel} />
-            <div style={{ width: `${taxPct}%` }} className="bg-teal-400" title="Property Tax" />
-            <div style={{ width: `${insPct}%` }} className="bg-zinc-500" title="Insurance" />
+            <HoverTip
+              text={`Mortgage P&I: $${Math.round(c.monthly_mortgage_pi).toLocaleString()}/mo`}
+              style={{ width: `${piPct}%` }}
+              className="block h-full"
+            >
+              <div className="h-full w-full bg-blue-400" />
+            </HoverTip>
+            <HoverTip
+              text={`${feeLabel}: $${Math.round(c.monthly_hoa_or_maint).toLocaleString()}/mo`}
+              style={{ width: `${feePct}%` }}
+              className="block h-full"
+            >
+              <div className="h-full w-full bg-indigo-400" />
+            </HoverTip>
+            {taxPct > 0 && (
+              <HoverTip
+                text={`Property Tax: $${Math.round(c.monthly_tax).toLocaleString()}/mo`}
+                style={{ width: `${taxPct}%` }}
+                className="block h-full"
+              >
+                <div className="h-full w-full bg-teal-400" />
+              </HoverTip>
+            )}
+            <HoverTip
+              text={`Insurance: $${Math.round(c.monthly_insurance).toLocaleString()}/mo`}
+              style={{ width: `${insPct}%` }}
+              className="block h-full"
+            >
+              <div className="h-full w-full bg-zinc-500" />
+            </HoverTip>
           </div>
           <div className="space-y-1 text-xs">
             <div className="flex justify-between">
@@ -317,9 +360,121 @@ export function ListingDrawer({
           </div>
         </div>
 
+        {/* NYT-Style Buy vs. Rent Comparison */}
+        {item.buy_vs_rent && (
+          <div className="space-y-2.5 rounded-xl border border-zinc-800 bg-zinc-900/50 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center text-xs font-medium text-zinc-200">
+                Buy vs. Rent ({item.buy_vs_rent.hold_years}-Yr Horizon)
+                <InfoTip
+                  align="left"
+                  text="Equivalent Monthly Rent is the NYT breakeven number: if you can rent a similar place for less than this amount, renting beats buying over your hold horizon (after opportunity cost, equity, appreciation, and selling costs)."
+                />
+              </div>
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                  item.buy_vs_rent.verdict === "BUY_WINS"
+                    ? "bg-teal-500/15 text-teal-300"
+                    : item.buy_vs_rent.verdict === "RENT_WINS"
+                    ? "bg-blue-500/15 text-blue-300"
+                    : "bg-zinc-800 text-zinc-300"
+                }`}
+              >
+                {item.buy_vs_rent.net_advantage_buy >= 0
+                  ? `Buy saves +$${Math.round(item.buy_vs_rent.net_advantage_buy / 1000)}k`
+                  : `Renting saves +$${Math.round(Math.abs(item.buy_vs_rent.net_advantage_buy) / 1000)}k`}
+              </span>
+            </div>
+
+            <p className="text-xs leading-relaxed text-zinc-300">
+              Buying here is equivalent to renting at{" "}
+              <strong className="text-zinc-50">
+                ${Math.round(item.buy_vs_rent.equivalent_monthly_rent).toLocaleString()}/mo
+              </strong>{" "}
+              vs. your current{" "}
+              <strong className="text-zinc-50">
+                ${Math.round(item.buy_vs_rent.current_monthly_rent).toLocaleString()}/mo
+              </strong>
+              .{" "}
+              <span className="text-zinc-400">
+                {item.buy_vs_rent.breakeven_year
+                  ? `Breaks even in Year ${item.buy_vs_rent.breakeven_year}.`
+                  : "Renting stays ahead through Year 15."}
+              </span>
+            </p>
+
+            {item.buy_vs_rent.yearly_series.length > 0 && (
+              <div className="h-36 w-full pt-1">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={item.buy_vs_rent.yearly_series}
+                    margin={{ top: 4, right: 8, bottom: 0, left: -12 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+                    <XAxis dataKey="year" tickFormatter={(v) => `Y${v}`} stroke="#71717a" fontSize={10} />
+                    <YAxis
+                      tickFormatter={(v) => `$${Math.round(v / 1000)}k`}
+                      stroke="#71717a"
+                      fontSize={10}
+                    />
+                    <ReferenceLine x={item.buy_vs_rent.hold_years} stroke="#a1a1aa" strokeDasharray="3 3" />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "#18181b",
+                        border: "1px solid #3f3f46",
+                        borderRadius: 8,
+                        fontSize: 11,
+                        color: "#f4f4f5",
+                      }}
+                      labelStyle={{ color: "#fafafa", fontWeight: 600, marginBottom: 2 }}
+                      itemStyle={{ color: "#e4e4e7" }}
+                      labelFormatter={(v) => `Year ${v}`}
+                      formatter={(val, name) => [
+                        `$${Math.round(Number(val)).toLocaleString()}`,
+                        name === "buy_net_cost" ? "Buy Net Cost" : "Rent Net Cost",
+                      ]}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="buy_net_cost"
+                      stroke="#2dd4bf"
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="rent_net_cost"
+                      stroke="#60a5fa"
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+            <div className="flex items-center justify-between text-[10px] text-zinc-500">
+              <div className="flex items-center gap-3">
+                <span className="flex items-center gap-1">
+                  <span className="h-2 w-2 rounded-full bg-teal-400" /> Buy Net Cost
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="h-2 w-2 rounded-full bg-blue-400" /> Rent Net Cost
+                </span>
+              </div>
+              <span>Lower line = better</span>
+            </div>
+          </div>
+        )}
+
         {/* Upfront Cash to Close */}
         <div className="space-y-1.5 rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 text-xs">
-          <div className="font-medium text-zinc-200">NYC Cash to Close Estimate</div>
+          <div className="flex items-center font-medium text-zinc-200">
+            NYC Cash to Close Estimate
+            <InfoTip
+              align="left"
+              text="Includes down payment + NYC Mansion Tax (1%+ at $1M+) + attorney/title fees. Condos & townhouses also pay NYC Mortgage Recording Tax (~1.925% of loan); co-ops are exempt."
+            />
+          </div>
           <div className="flex justify-between text-zinc-400">
             <span>Down Payment ({c.down_payment_pct}%)</span>
             <span className="text-zinc-100">${Math.round(c.down_payment_amount).toLocaleString()}</span>

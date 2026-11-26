@@ -1,25 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  BarChart3,
-  Building2,
-  GripVertical,
-  Heart,
-  List,
-  Map as MapIcon,
-  PanelLeftClose,
-  PanelLeftOpen,
-  PanelRightClose,
-  PanelRightOpen,
-  RefreshCw,
-  Scale,
-  Search,
-  Sliders,
-} from "lucide-react";
+import { GripVertical } from "lucide-react";
 import { AnalyticsView } from "./components/AnalyticsView";
 import { CompareBar } from "./components/CompareBar";
 import { KnobSidebar } from "./components/KnobSidebar";
 import { ListingDrawer } from "./components/ListingDrawer";
+import { ListingsFeed } from "./components/ListingsFeed";
 import { NycMap } from "./components/NycMap";
+import { TopHeader } from "./components/TopHeader";
+import { useLists } from "./hooks/useLists";
 import type { ConfigResponse, KnobsState, RankResponse, ScoredListing } from "./types";
 
 const DEFAULT_KNOBS: KnobsState = {
@@ -32,6 +20,11 @@ const DEFAULT_KNOBS: KnobsState = {
   use_after_tax_for_filter: false,
   est_rent_per_unit: 3200,
   use_net_rental_for_filter: true,
+  current_monthly_rent: 5300,
+  hold_years: 7,
+  home_appreciation_pct: 3.0,
+  rent_growth_pct: 3.5,
+  investment_return_pct: 7.0,
   min_units: 1,
   min_beds: 1,
   min_sqft: 600,
@@ -62,9 +55,8 @@ export function App() {
     return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
   });
   const [directListing, setDirectListing] = useState<ScoredListing | null>(null);
-  const [savedIds, setSavedIds] = useState<number[]>([]);
-  const [customLists, setCustomLists] = useState<Record<string, number[]>>({});
-  const [activeList, setActiveList] = useState<string | null>(null);
+  const [selectedBoroughs, setSelectedBoroughs] = useState<string[]>([]);
+  const [selectedNeighborhoods, setSelectedNeighborhoods] = useState<string[]>([]);
   const [pinnedIds, setPinnedIds] = useState<number[]>([]);
   const [leftSidebarWidth, setLeftSidebarWidth] = useState<number>(288);
   const [rightPanelWidth, setRightPanelWidth] = useState<number>(400);
@@ -75,11 +67,19 @@ export function App() {
   const [dragTarget, setDragTarget] = useState<"left" | "right" | null>(null);
   const splitRef = useRef<HTMLDivElement | null>(null);
 
+  const {
+    savedIds,
+    customLists,
+    activeList,
+    setActiveList,
+    toggleSave,
+    createCustomList,
+    toggleInCustomList,
+    deleteCustomList,
+  } = useLists();
+
   useEffect(() => {
-    const onResize = () => {
-      const desktop = window.innerWidth >= 1024;
-      setIsDesktop(desktop);
-    };
+    const onResize = () => setIsDesktop(window.innerWidth >= 1024);
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
@@ -94,8 +94,7 @@ export function App() {
       const container = splitRef.current;
       if (!container) return;
       const rect = container.getBoundingClientRect();
-      const fromRight = rect.right - e.clientX;
-      const clamped = Math.max(240, Math.min(Math.round(rect.width * 0.65), fromRight));
+      const clamped = Math.max(240, Math.min(Math.round(rect.width * 0.65), rect.right - e.clientX));
       setRightPanelWidth(clamped);
     };
     const onUp = () => setDragTarget(null);
@@ -125,6 +124,11 @@ export function App() {
           use_after_tax_for_filter: cfg.budget.use_after_tax_for_filter,
           est_rent_per_unit: cfg.budget.est_rent_per_unit ?? 3200,
           use_net_rental_for_filter: cfg.budget.use_net_rental_for_filter ?? true,
+          current_monthly_rent: cfg.budget.current_monthly_rent ?? 5300,
+          hold_years: cfg.budget.hold_years ?? 7,
+          home_appreciation_pct: cfg.budget.home_appreciation_pct ?? 3.0,
+          rent_growth_pct: cfg.budget.rent_growth_pct ?? 3.5,
+          investment_return_pct: cfg.budget.investment_return_pct ?? 7.0,
           min_units: cfg.search.min_units ?? 1,
           min_beds: cfg.search.min_beds,
           min_sqft: cfg.search.min_sqft,
@@ -139,24 +143,9 @@ export function App() {
         setBaseKnobs(loaded);
         setKnobs(loaded);
       })
-      .catch(() => { });
-
-    fetch("/api/saved")
-      .then((r) => (r.ok ? r.json() : { saved_ids: [] }))
-      .then((d) => {
-        if (Array.isArray(d.saved_ids)) setSavedIds(d.saved_ids);
-      })
-      .catch(() => { });
-
-    fetch("/api/lists")
-      .then((r) => (r.ok ? r.json() : { lists: {} }))
-      .then((d) => {
-        if (d && typeof d.lists === "object") setCustomLists(d.lists);
-      })
-      .catch(() => { });
+      .catch(() => {});
   }, []);
 
-  // Sync ?listing=<id> URL parameter whenever selectedId changes
   useEffect(() => {
     const url = new URL(window.location.href);
     if (selectedId != null) {
@@ -170,10 +159,11 @@ export function App() {
   const fetchRanked = useCallback(async (state: KnobsState) => {
     setLoading(true);
     try {
+      const { search_query: _ignored, ...serverPayload } = state;
       const resp = await fetch("/api/rank", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(state),
+        body: JSON.stringify(serverPayload),
       });
       const data: RankResponse = await resp.json();
       setRankData(data);
@@ -183,9 +173,7 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchRanked(knobs);
-    }, 120);
+    const timer = setTimeout(() => fetchRanked(knobs), 120);
     return () => clearTimeout(timer);
   }, [knobs, fetchRanked]);
 
@@ -200,24 +188,63 @@ export function App() {
   };
 
   const allListings = rankData?.listings ?? [];
-  const listings = useMemo(() => {
-    if (activeList === "__favorites__") {
-      return allListings.filter((l) => savedIds.includes(l.id));
-    }
-    if (activeList && customLists[activeList]) {
-      const ids = customLists[activeList];
-      return allListings.filter((l) => ids.includes(l.id));
-    }
-    return allListings;
-  }, [allListings, activeList, savedIds, customLists]);
 
-  // If URL deep-linked to a listing not in the current filtered set, fetch it directly
-  useEffect(() => {
-    if (selectedId == null) {
-      setDirectListing(null);
-      return;
+  const availableBoroughs = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const item of allListings) {
+      const b = item.listing.borough || "Other";
+      counts.set(b, (counts.get(b) || 0) + 1);
     }
-    if (allListings.some((l) => l.id === selectedId)) {
+    return Array.from(counts.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [allListings]);
+
+  const availableNeighborhoods = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const item of allListings) {
+      if (selectedBoroughs.length > 0 && !selectedBoroughs.includes(item.listing.borough)) continue;
+      const n = item.listing.neighborhood || item.listing.borough;
+      if (n) counts.set(n, (counts.get(n) || 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [allListings, selectedBoroughs]);
+
+  const listings = useMemo(() => {
+    let out = allListings;
+    if (activeList === "__favorites__") {
+      out = out.filter((l) => savedIds.includes(l.id));
+    } else if (activeList && customLists[activeList]) {
+      const ids = customLists[activeList];
+      out = out.filter((l) => ids.includes(l.id));
+    }
+    if (selectedBoroughs.length > 0) {
+      out = out.filter((l) => selectedBoroughs.includes(l.listing.borough));
+    }
+    if (selectedNeighborhoods.length > 0) {
+      out = out.filter((l) =>
+        selectedNeighborhoods.includes(l.listing.neighborhood || l.listing.borough)
+      );
+    }
+    const q = knobs.search_query.trim().toLowerCase();
+    if (q) {
+      out = out.filter(
+        (s) =>
+          s.listing.address.toLowerCase().includes(q) ||
+          s.listing.neighborhood.toLowerCase().includes(q) ||
+          s.listing.borough.toLowerCase().includes(q) ||
+          s.listing.zip_code.toLowerCase().includes(q) ||
+          s.nearest_station.toLowerCase().includes(q) ||
+          s.listing.description.toLowerCase().includes(q)
+      );
+    }
+    return out;
+  }, [allListings, activeList, savedIds, customLists, selectedBoroughs, selectedNeighborhoods, knobs.search_query]);
+
+  useEffect(() => {
+    if (selectedId == null || allListings.some((l) => l.id === selectedId)) {
       setDirectListing(null);
       return;
     }
@@ -226,7 +253,7 @@ export function App() {
       .then((d) => {
         if (d && d.id === selectedId) setDirectListing(d as ScoredListing);
       })
-      .catch(() => { });
+      .catch(() => {});
   }, [selectedId, allListings]);
 
   const selectedItem = useMemo(
@@ -238,432 +265,121 @@ export function App() {
     [allListings, pinnedIds]
   );
 
-  const toggleSave = async (id: number) => {
-    setSavedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-    try {
-      const resp = await fetch(`/api/saved/${id}`, { method: "POST" });
-      if (resp.ok) {
-        const data = await resp.json();
-        if (Array.isArray(data.saved_ids)) setSavedIds(data.saved_ids);
-      }
-    } catch {
-      // Keep optimistic state if offline
-    }
+  const toggleBorough = (name: string) =>
+    setSelectedBoroughs((prev) => (prev.includes(name) ? prev.filter((x) => x !== name) : [...prev, name]));
+
+  const toggleNeighborhood = (name: string) =>
+    setSelectedNeighborhoods((prev) =>
+      prev.includes(name) ? prev.filter((x) => x !== name) : [...prev, name]
+    );
+
+  const addNeighborhood = (hood: string) => {
+    if (!selectedNeighborhoods.includes(hood)) setSelectedNeighborhoods((prev) => [...prev, hood]);
   };
 
-  const createCustomList = async (name: string, initialId?: number) => {
-    const clean = name.trim();
-    if (!clean) return;
-    setCustomLists((prev) => ({
-      ...prev,
-      [clean]: initialId != null ? Array.from(new Set([...(prev[clean] || []), initialId])) : prev[clean] || [],
-    }));
-    try {
-      if (initialId != null) {
-        const resp = await fetch(`/api/lists/${encodeURIComponent(clean)}/toggle/${initialId}`, {
-          method: "POST",
-        });
-        if (resp.ok) {
-          const data = await resp.json();
-          if (data.lists) setCustomLists(data.lists);
-        }
-      } else {
-        const resp = await fetch("/api/lists", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: clean }),
-        });
-        if (resp.ok) {
-          const data = await resp.json();
-          if (data.lists) setCustomLists(data.lists);
-        }
-      }
-    } catch {
-      // Keep optimistic state
-    }
-  };
-
-  const toggleInCustomList = async (listName: string, id: number) => {
-    setCustomLists((prev) => {
-      const cur = prev[listName] || [];
-      const next = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id];
-      return { ...prev, [listName]: next };
-    });
-    try {
-      const resp = await fetch(`/api/lists/${encodeURIComponent(listName)}/toggle/${id}`, {
-        method: "POST",
-      });
-      if (resp.ok) {
-        const data = await resp.json();
-        if (data.lists) setCustomLists(data.lists);
-      }
-    } catch {
-      // Keep optimistic state
-    }
-  };
-
-  const deleteCustomList = async (listName: string) => {
-    setCustomLists((prev) => {
-      const next = { ...prev };
-      delete next[listName];
-      return next;
-    });
-    if (activeList === listName) setActiveList(null);
-    try {
-      const resp = await fetch(`/api/lists/${encodeURIComponent(listName)}`, { method: "DELETE" });
-      if (resp.ok) {
-        const data = await resp.json();
-        if (data.lists) setCustomLists(data.lists);
-      }
-    } catch {
-      // Keep optimistic state
-    }
-  };
-
-  const togglePin = (id: number) => {
+  const togglePin = (id: number) =>
     setPinnedIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : prev.length < 3 ? [...prev, id] : [...prev.slice(1), id]
     );
+
+  const resetAll = () => {
+    setKnobs(baseKnobs);
+    setSelectedBoroughs([]);
+    setSelectedNeighborhoods([]);
   };
 
-  const renderListingsFeed = () => (
-    <div
-      style={isDesktop ? { width: `${rightPanelWidth}px` } : undefined}
-      className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 lg:flex-none lg:shrink-0"
-    >
-      <div className="flex items-center justify-between gap-2 border-b border-zinc-800 px-3 py-2 text-xs text-zinc-400">
-        <span>{loading ? "Updating..." : `${listings.length} listings ranked`}</span>
-        <span className="text-[11px] text-zinc-500">Tap card to inspect</span>
-      </div>
-      {!isDesktop && (
-        <div className="border-b border-zinc-800 p-2">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-2.5 top-2 h-3.5 w-3.5 text-zinc-500" />
-            <input
-              type="text"
-              placeholder="Filter address, hood, zip..."
-              value={knobs.search_query}
-              onChange={(e) => setKnobs({ ...knobs, search_query: e.target.value })}
-              className="w-full rounded-lg border border-zinc-800 bg-zinc-900 py-1.5 pl-8 pr-3 text-xs text-zinc-100 placeholder:text-zinc-500 focus:border-blue-500 focus:outline-none"
-            />
-          </div>
-        </div>
-      )}
-      <div className="flex-1 divide-y divide-zinc-800/80 overflow-y-auto">
-        {listings.map((item: ScoredListing) => {
-          const { listing: l, costs: c } = item;
-          const active = item.id === selectedId;
-          const pinned = pinnedIds.includes(item.id);
-          return (
-            <div
-              key={item.id}
-              onClick={() => setSelectedId(item.id)}
-              className={`cursor-pointer p-3 transition ${active ? "bg-zinc-800/70" : "hover:bg-zinc-900/80"
-                } ${!item.passes_filters ? "opacity-60" : ""}`}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="truncate text-xs font-semibold text-zinc-100">
-                    {l.address} {l.unit ? `#${l.unit}` : ""}
-                  </div>
-                  <div className="text-[11px] text-zinc-400">
-                    {l.neighborhood || l.borough} •{" "}
-                    <span className="uppercase">{l.property_type}</span> • {l.beds}bd/{l.baths}ba
-                    {l.sqft ? ` • ${l.sqft.toLocaleString()} sqft` : ""}
-                  </div>
-                </div>
-                <div className="shrink-0 text-right">
-                  <div className="text-sm font-semibold text-zinc-50">
-                    $
-                    {Math.round(
-                      c.rentable_units > 0 && knobs.use_net_rental_for_filter
-                        ? c.net_monthly_cost
-                        : c.total_monthly_cost
-                    ).toLocaleString()}
-                    <span className="text-[10px] font-normal text-zinc-400">
-                      {c.rentable_units > 0 && knobs.use_net_rental_for_filter ? "/mo net" : "/mo"}
-                    </span>
-                  </div>
-                  <div className="text-[11px] text-zinc-400">
-                    ${Math.round(l.price).toLocaleString()}
-                  </div>
-                </div>
-              </div>
+  const sidebarProps = {
+    knobs,
+    onChange: setKnobs,
+    onReset: resetAll,
+    width: leftSidebarWidth,
+    savedCount: savedIds.length,
+    customLists,
+    activeList,
+    onCreateList: (name: string) => createCustomList(name),
+    onDeleteList: deleteCustomList,
+    availableBoroughs,
+    selectedBoroughs,
+    onToggleBorough: toggleBorough,
+    availableNeighborhoods,
+    selectedNeighborhoods,
+    onToggleNeighborhood: toggleNeighborhood,
+    onClearLocations: () => {
+      setSelectedBoroughs([]);
+      setSelectedNeighborhoods([]);
+    },
+  };
 
-              <div className="mt-2 flex items-center justify-between text-[11px]">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="rounded bg-blue-500/15 px-1.5 py-0.5 font-medium text-blue-300">
-                    {item.score.toFixed(1)}
-                  </span>
-                  {item.commute_minutes != null && (
-                    <span
-                      className="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-300"
-                      title={item.nearest_station ? `Via ${item.nearest_station}` : "To Midtown"}
-                    >
-                      {item.commute_mode === "walk" ? "🚶" : "🚇"} {item.commute_minutes}m
-                    </span>
-                  )}
-                  {c.rentable_units > 0 && (
-                    <span className="rounded bg-indigo-500/15 px-1.5 py-0.5 font-medium text-indigo-300">
-                      {c.num_units}U (−${Math.round((c.estimated_net_rental_income / 1000) * 10) / 10}k)
-                    </span>
-                  )}
-                  {c.dti_pct != null && (
-                    <span
-                      className={`rounded px-1.5 py-0.5 ${c.dti_pct <= 28
-                        ? "bg-teal-500/12 text-teal-300"
-                        : "bg-zinc-800 text-zinc-300"
-                        }`}
-                    >
-                      {c.dti_pct}% DTI
-                    </span>
-                  )}
-                  <span className="text-zinc-500">
-                    Fees ${Math.round(c.monthly_hoa_or_maint + c.monthly_tax).toLocaleString()}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleSave(item.id);
-                    }}
-                    className={`rounded p-1 ${savedIds.includes(item.id)
-                      ? "text-rose-400"
-                      : "text-zinc-500 hover:text-zinc-300"
-                      }`}
-                    title={savedIds.includes(item.id) ? "Favorited" : "Favorite listing"}
-                  >
-                    <Heart
-                      className={`h-3.5 w-3.5 ${savedIds.includes(item.id) ? "fill-rose-400" : ""}`}
-                    />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      togglePin(item.id);
-                    }}
-                    className={`rounded p-1 ${pinned ? "text-blue-400" : "text-zinc-500 hover:text-zinc-300"
-                      }`}
-                    title="Pin to Compare"
-                  >
-                    <Scale className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-        {listings.length === 0 && !loading && (
-          <div className="p-8 text-center text-xs text-zinc-500">
-            No listings match the current knobs. Try raising Max Monthly Cost or toggling "Show Rejected".
-          </div>
-        )}
-      </div>
-    </div>
+  const feedNode = (
+    <ListingsFeed
+      listings={listings}
+      allListings={allListings}
+      loading={loading}
+      isDesktop={isDesktop}
+      rightPanelWidth={rightPanelWidth}
+      selectedId={selectedId}
+      savedIds={savedIds}
+      pinnedIds={pinnedIds}
+      useNetRental={knobs.use_net_rental_for_filter}
+      searchQuery={knobs.search_query}
+      onSearchChange={(q) => setKnobs({ ...knobs, search_query: q })}
+      onSelectListing={(item) => setSelectedId(item.id)}
+      onSelectNeighborhood={addNeighborhood}
+      onToggleSave={toggleSave}
+      onTogglePin={togglePin}
+    />
   );
 
   return (
     <div className="flex h-[100dvh] flex-col overflow-hidden bg-zinc-950 text-zinc-100">
-      {/* Top Bar */}
-      <header className="flex shrink-0 items-center justify-between gap-2 border-b border-zinc-800/90 bg-zinc-950 px-3 py-2 lg:px-4 lg:py-2.5">
-        <div className="flex min-w-0 items-center gap-2 lg:gap-3">
-          <button
-            onClick={() => setShowSidebar((v) => !v)}
-            className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-300 hover:border-zinc-700 hover:text-zinc-100"
-            title={showSidebar ? "Hide filters" : "Show filters"}
-          >
-            {isDesktop ? (
-              showSidebar ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />
-            ) : (
-              <>
-                <Sliders className="h-3.5 w-3.5 text-blue-400" />
-                <span>Filters</span>
-              </>
-            )}
-          </button>
+      <TopHeader
+        isDesktop={isDesktop}
+        showSidebar={showSidebar}
+        onToggleSidebar={() => setShowSidebar((v) => !v)}
+        showRightPanel={showRightPanel}
+        onToggleRightPanel={() => setShowRightPanel((v) => !v)}
+        summary={rankData?.summary ?? null}
+        listingsCount={listings.length}
+        allListings={allListings}
+        searchQuery={knobs.search_query}
+        onSearchChange={(q) => setKnobs({ ...knobs, search_query: q })}
+        onSelectListing={(item) => setSelectedId(item.id)}
+        onSelectNeighborhood={addNeighborhood}
+        savedCount={savedIds.length}
+        activeList={activeList}
+        onSelectList={setActiveList}
+        tab={tab}
+        onTabChange={setTab}
+        mobilePane={mobilePane}
+        onMobilePaneChange={setMobilePane}
+        polling={polling}
+        onPoll={handlePoll}
+      />
 
-          <div className="hidden items-center gap-1.5 font-semibold tracking-tight text-zinc-100 sm:flex">
-            <Building2 className="h-4 w-4 text-blue-400" />
-            <span>find house</span>
-          </div>
-
-          <div className="hidden items-center gap-3 text-xs text-zinc-400 xl:flex">
-            <span>
-              Matches: <strong className="text-zinc-100">{rankData?.summary.matching_count ?? 0}</strong> /{" "}
-              {rankData?.summary.total_active ?? 0} active
-            </span>
-            {rankData && rankData.summary.avg_monthly_cost > 0 && (
-              <span>
-                Avg Monthly:{" "}
-                <strong className="text-zinc-200">
-                  ${Math.round(rankData.summary.avg_monthly_cost).toLocaleString()}/mo
-                </strong>
-              </span>
-            )}
-          </div>
-        </div>
-
-        <div className="flex shrink-0 items-center gap-1.5 lg:gap-2">
-          <button
-            onClick={() => setActiveList((cur) => (cur === "__favorites__" ? null : "__favorites__"))}
-            className={`flex items-center gap-1 rounded-lg border px-2 py-1.5 text-xs font-medium transition ${activeList === "__favorites__"
-              ? "border-rose-500/50 bg-rose-500/15 text-rose-300"
-              : "border-zinc-800 bg-zinc-900 text-zinc-300 hover:border-zinc-700"
-              }`}
-            title="Show favorited listings only"
-          >
-            <Heart
-              className={`h-3.5 w-3.5 ${activeList === "__favorites__" ? "fill-rose-400 text-rose-400" : ""}`}
-            />
-            <span className="hidden sm:inline">Favorites</span>
-            {savedIds.length > 0 && <span className="text-[10px]">({savedIds.length})</span>}
-          </button>
-
-          {activeList && activeList !== "__favorites__" && (
-            <button
-              onClick={() => setActiveList(null)}
-              className="hidden items-center gap-1 rounded-lg border border-blue-500/50 bg-blue-500/15 px-2 py-1.5 text-xs font-medium text-blue-200 sm:flex"
-              title="Click to clear list filter"
-            >
-              <span className="max-w-[110px] truncate">{activeList}</span>
-              <span className="text-[10px] text-blue-300">×</span>
-            </button>
-          )}
-
-          {isDesktop && tab === "map" && (
-            <button
-              onClick={() => setShowRightPanel((v) => !v)}
-              className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900 px-2.5 py-1.5 text-xs text-zinc-300 hover:border-zinc-700 hover:text-zinc-100"
-              title={showRightPanel ? "Hide listings panel" : "Show listings panel"}
-            >
-              {showRightPanel ? <PanelRightClose className="h-3.5 w-3.5" /> : <PanelRightOpen className="h-3.5 w-3.5" />}
-              <span>{showRightPanel ? "Hide List" : "Show List"}</span>
-            </button>
-          )}
-
-          {isDesktop && (
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-2.5 top-2 h-3.5 w-3.5 text-zinc-500" />
-              <input
-                type="text"
-                placeholder="Filter address, hood, zip..."
-                value={knobs.search_query}
-                onChange={(e) => setKnobs({ ...knobs, search_query: e.target.value })}
-                className="w-44 rounded-lg border border-zinc-800 bg-zinc-900 py-1.5 pl-8 pr-3 text-xs text-zinc-100 placeholder:text-zinc-500 focus:border-blue-500 focus:outline-none xl:w-52"
-              />
-            </div>
-          )}
-
-          {/* Mobile View Switcher (Map | List | Charts) vs Desktop (Map & List | Analytics) */}
-          {isDesktop ? (
-            <div className="flex rounded-lg border border-zinc-800 bg-zinc-900 p-0.5 text-xs">
-              <button
-                onClick={() => setTab("map")}
-                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 font-medium ${tab === "map" ? "bg-zinc-800 text-zinc-100" : "text-zinc-400 hover:text-zinc-200"
-                  }`}
-              >
-                <MapIcon className="h-3.5 w-3.5" /> Map &amp; List
-              </button>
-              <button
-                onClick={() => setTab("analytics")}
-                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 font-medium ${tab === "analytics" ? "bg-zinc-800 text-zinc-100" : "text-zinc-400 hover:text-zinc-200"
-                  }`}
-              >
-                <BarChart3 className="h-3.5 w-3.5" /> Analytics
-              </button>
-            </div>
-          ) : (
-            <div className="flex rounded-lg border border-zinc-800 bg-zinc-900 p-0.5 text-xs">
-              <button
-                onClick={() => {
-                  setTab("map");
-                  setMobilePane("map");
-                }}
-                className={`flex items-center gap-1 rounded-md px-2 py-1 font-medium ${tab === "map" && mobilePane === "map" ? "bg-zinc-800 text-zinc-100" : "text-zinc-400"
-                  }`}
-              >
-                <MapIcon className="h-3.5 w-3.5" /> Map
-              </button>
-              <button
-                onClick={() => {
-                  setTab("map");
-                  setMobilePane("list");
-                }}
-                className={`flex items-center gap-1 rounded-md px-2 py-1 font-medium ${tab === "map" && mobilePane === "list" ? "bg-zinc-800 text-zinc-100" : "text-zinc-400"
-                  }`}
-              >
-                <List className="h-3.5 w-3.5" /> List
-                <span className="hidden text-[10px] text-zinc-400 sm:inline">({listings.length})</span>
-              </button>
-              <button
-                onClick={() => setTab("analytics")}
-                className={`flex items-center gap-1 rounded-md px-2 py-1 font-medium ${tab === "analytics" ? "bg-zinc-800 text-zinc-100" : "text-zinc-400"
-                  }`}
-                aria-label="Analytics"
-              >
-                <BarChart3 className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          )}
-
-          <button
-            onClick={handlePoll}
-            disabled={polling}
-            className="flex items-center gap-1.5 rounded-lg bg-zinc-100 px-2.5 py-1.5 text-xs font-semibold text-zinc-950 hover:bg-white disabled:opacity-50"
-            title="Poll live listings"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${polling ? "animate-spin" : ""}`} />
-            <span className="hidden sm:inline">{polling ? "Polling..." : "Poll Live"}</span>
-          </button>
-        </div>
-      </header>
-
-      {/* Body */}
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
-        {/* Desktop Inline Resizable Sidebar */}
         {isDesktop && showSidebar && (
           <>
-            <KnobSidebar
-              knobs={knobs}
-              onChange={setKnobs}
-              onReset={() => setKnobs(baseKnobs)}
-              width={leftSidebarWidth}
-              savedCount={savedIds.length}
-              customLists={customLists}
-              activeList={activeList}
-              onSelectList={setActiveList}
-              onCreateList={(name) => createCustomList(name)}
-              onDeleteList={deleteCustomList}
-            />
+            <KnobSidebar {...sidebarProps} onSelectList={setActiveList} />
             <div
               onMouseDown={() => setDragTarget("left")}
-              className={`w-1.5 shrink-0 cursor-col-resize transition ${dragTarget === "left" ? "bg-blue-500/50" : "hover:bg-zinc-700/60"
-                }`}
+              className={`w-1.5 shrink-0 cursor-col-resize transition ${
+                dragTarget === "left" ? "bg-blue-500/50" : "hover:bg-zinc-700/60"
+              }`}
               title="Drag to resize knobs sidebar"
             />
           </>
         )}
 
-        {/* Mobile Slide-Over Filters Drawer */}
         {!isDesktop && showSidebar && (
           <div className="fixed inset-0 z-[900] flex">
             <KnobSidebar
-              knobs={knobs}
-              onChange={setKnobs}
-              onReset={() => setKnobs(baseKnobs)}
-              width={leftSidebarWidth}
+              {...sidebarProps}
               isMobile
               onClose={() => setShowSidebar(false)}
-              savedCount={savedIds.length}
-              customLists={customLists}
-              activeList={activeList}
               onSelectList={(name) => {
                 setActiveList(name);
                 setShowSidebar(false);
               }}
-              onCreateList={(name) => createCustomList(name)}
-              onDeleteList={deleteCustomList}
             />
             <div
               onClick={() => setShowSidebar(false)}
@@ -687,13 +403,14 @@ export function App() {
                   <>
                     <div
                       onMouseDown={() => setDragTarget("right")}
-                      className={`flex w-3 shrink-0 cursor-col-resize items-center justify-center ${dragTarget === "right" ? "text-blue-400" : "text-zinc-600 hover:text-zinc-300"
-                        }`}
+                      className={`flex w-3 shrink-0 cursor-col-resize items-center justify-center ${
+                        dragTarget === "right" ? "text-blue-400" : "text-zinc-600 hover:text-zinc-300"
+                      }`}
                       title="Drag to resize listings panel"
                     >
                       <GripVertical className="h-5 w-4" />
                     </div>
-                    {renderListingsFeed()}
+                    {feedNode}
                   </>
                 )}
               </div>
@@ -708,7 +425,7 @@ export function App() {
                     />
                   </div>
                 ) : (
-                  renderListingsFeed()
+                  feedNode
                 )}
               </div>
             )

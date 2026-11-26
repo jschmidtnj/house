@@ -33,6 +33,9 @@ body,
 .house-pin {
   background: transparent;
   border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 path.leaflet-interactive:focus {
@@ -69,4 +72,110 @@ path.leaflet-interactive:focus {
 
 .hood-label-target {
   color: rgba(228, 228, 231, 0.9);
+}
+
+.map-price-pin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: max-content;
+  font-weight: 700;
+  font-size: 11px;
+  line-height: 1;
+  padding: 5px 9px;
+  border-radius: 9999px;
+  border: 1.5px solid rgba(9, 9, 11, 0.85);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.55);
+  white-space: nowrap;
+  transition: transform 120ms ease;
+}
+
+.map-price-pin-selected {
+  border-color: #3b82f6;
+  transform: scale(1.18);
+}
+
+.map-cluster-pill {
+  background: #18181b;
+  color: #fafafa;
+  width: max-content;
+  font-weight: 700;
+  font-size: 11px;
+  line-height: 1;
+  padding: 5px 10px;
+  border-radius: 9999px;
+  border: 2px solid #60a5fa;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.map-cluster-bubble {
+  background: #18181b;
+  color: #fafafa;
+  font-weight: 800;
+  font-size: 11px;
+  width: 30px;
+  height: 30px;
+  border-radius: 9999px;
+  border: 2px solid #60a5fa;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.map-cluster-count {
+  color: #09090b;
+  border-radius: 9999px;
+  padding: 0 5px;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.map-tooltip-card {
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.map-tooltip-title {
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.map-tooltip-meta {
+  font-size: 11px;
+  opacity: 0.9;
+}
+
+.map-tooltip-hint {
+  font-size: 10px;
+  color: #a1a1aa;
+  margin-top: 2px;
+}
+
+.map-mta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 4px;
+}
+
+.map-mta-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 9999px;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.map-mta-badge-wide {
+  width: auto;
+  padding: 0 5px;
 }

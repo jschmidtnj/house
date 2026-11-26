@@ -213,3 +213,48 @@ def test_homeharvest_baths_and_tax_fallbacks():
     assert parsed2 is not None
     assert parsed2.baths == 2.0
     assert parsed2.monthly_tax is None
+
+
+def test_townhouse_sanity_check_reclassifies_condo_units():
+    # High-rise condo unit mistakenly tagged TOWNHOMES by Realtor.com
+    fake_th = {
+        "property_id": "hh-fake-th",
+        "street": "11 Hoyt St",
+        "unit": "Apt 47B",
+        "city": "Brooklyn",
+        "county": "Kings",
+        "zip_code": "11201",
+        "style": "TOWNHOMES",
+        "list_price": 1_100_000,
+        "beds": 1,
+        "full_baths": 1,
+        "sqft": 710,
+        "hoa_fee": 867,
+        "text": "Luxury 47th-floor residential tower apartment.",
+    }
+    res_fake = parse_homeharvest_row(fake_th)
+    assert res_fake is not None
+    assert res_fake.property_type == "condo"
+    assert res_fake.num_units == 1
+
+    # Genuine whole 2-family townhouse (no unit, no HOA, 4 beds, 2 kitchens)
+    real_th = {
+        "property_id": "hh-real-th",
+        "street": "1152 Jefferson Ave",
+        "unit": "",
+        "city": "Brooklyn",
+        "county": "Kings",
+        "zip_code": "11221",
+        "style": "MULTI_FAMILY",
+        "list_price": 1_150_000,
+        "beds": 4,
+        "full_baths": 3,
+        "sqft": 2100,
+        "hoa_fee": None,
+        "tax": 6500,
+        "text": "Renovated 2-family brick townhouse with 2 full kitchens and garden rental.",
+    }
+    res_real = parse_homeharvest_row(real_th)
+    assert res_real is not None
+    assert res_real.property_type == "multifamily"
+    assert res_real.num_units == 2

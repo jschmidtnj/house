@@ -78,6 +78,31 @@ class CostBreakdown:
 
 
 @dataclass
+class BuyVsRentPoint:
+    """Cumulative net cost (cash spent + opportunity cost - net equity) at a given year."""
+
+    year: int
+    buy_net_cost: float
+    rent_net_cost: float
+    buy_advantage: float  # Positive = buying is cheaper / builds more wealth than renting
+
+
+@dataclass
+class BuyVsRentComparison:
+    """NYT-style Buy vs. Rent comparison over a configurable holding horizon."""
+
+    hold_years: int
+    current_monthly_rent: float
+    equivalent_monthly_rent: float    # NYT headline: rent below this -> renting wins; above -> buying wins
+    buy_total_net_cost: float         # Total net cost of buying over hold_years
+    rent_total_net_cost: float        # Total net cost of renting over hold_years
+    net_advantage_buy: float          # rent_total_net_cost - buy_total_net_cost (+ = Buy wins)
+    breakeven_year: int | None        # First year (1..20) where buying beats renting, or None
+    verdict: str                      # "BUY_WINS" | "CLOSE_CALL" | "RENT_WINS"
+    yearly_series: list[BuyVsRentPoint] = field(default_factory=list)
+
+
+@dataclass
 class ScoredListing:
     """A listing paired with its cost breakdown, eligibility, and composite score."""
 

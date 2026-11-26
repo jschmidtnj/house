@@ -46,7 +46,7 @@ def normalize_property_type(raw: str | None) -> str:
         return "condop"
     if "co-op" in text or "coop" in text or "cooperative" in text:
         return "coop"
-    if "multi" in text or "duplex" in text or "triplex" in text:
+    if "multi" in text:
         return "multifamily"
     if "townhouse" in text or "townhome" in text or "single_family" in text or "single family" in text:
         return "townhouse"
@@ -107,6 +107,68 @@ def sanitize_baths(baths: float | None, description: str = "") -> float:
         except ValueError:
             pass
     return 1.0
+
+
+_MULTI_KITCHEN_RE = re.compile(
+    r"\b(?:two|three|four|2|3|4)\s+(?:separate\s+|full\s+|eat-in\s+)?kitchens?\b",
+    re.IGNORECASE,
+)
+
+
+def sanitize_property_type_and_units(
+    property_type: str,
+    num_units: int,
+    *,
+    unit: str = "",
+    beds: float = 0.0,
+    baths: float = 0.0,
+    monthly_hoa: float | None = None,
+    monthly_maintenance: float | None = None,
+    description: str = "",
+) -> tuple[str, int]:
+    """
+    Sanity-check NYC townhouse / multi-family classifications so condo/co-op units
+    (like '11 Hoyt St #Apt 47B' or a 1BR garden duplex) aren't misclassified as whole townhouses.
+    """
+    ptype = (property_type or "condo").lower()
+    desc = (description or "").lower()
+    has_unit = bool((unit or "").strip())
+    has_hoa = monthly_hoa is not None and monthly_hoa > 0
+    has_maint = monthly_maintenance is not None and monthly_maintenance > 0
+
+    if ptype in ("townhouse", "multifamily"):
+        # An apartment with a unit number or monthly HOA/maintenance is a condo/co-op, not a whole building
+        if has_unit or has_hoa or has_maint:
+            is_coop = any(k in desc for k in ("co-op", "coop", "cooperative", "board approval"))
+            return ("coop" if (has_maint or is_coop) else "condo"), 1
+
+        # Whole townhouse / multi-family sanity checks:
+        # Must have >= 2 bedrooms (unless feed omitted beds=0 on an explicit multi-family building)
+        if 0 < beds < 2:
+            return "condo", 1
+
+        # For multi-unit house-hacking (>= 2 units), require >= 2 baths OR explicit 2+ kitchens / legal multi-family
+        has_multi_kitchen = bool(_MULTI_KITCHEN_RE.search(description or ""))
+        has_legal_multi = any(
+            k in desc
+            for k in (
+                "two-family", "two family", "2-family", "2 family",
+                "three-family", "three family", "3-family", "3 family",
+                "four-family", "four family", "4-family", "4 family",
+                "legal dwelling units", "rental unit", "multi-family", "multifamily",
+            )
+        )
+        if num_units >= 2:
+            if baths < 2 and not has_multi_kitchen and not has_legal_multi:
+                return "townhouse", 1
+            return "multifamily", max(2, num_units)
+
+        if has_multi_kitchen and beds >= 2:
+            return "multifamily", 2
+
+        return ptype, 1
+
+    return ptype, 1
 
 
 _AMENITY_KEYWORDS = {

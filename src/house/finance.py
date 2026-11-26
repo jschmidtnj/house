@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from house.config import BudgetConfig
-from house.models import CostBreakdown, ListingData
+from house.models import BuyVsRentComparison, BuyVsRentPoint, CostBreakdown, ListingData
 
 
 def calculate_monthly_mortgage_pi(
@@ -222,4 +222,134 @@ def calculate_cost_breakdown(listing: ListingData, budget: BudgetConfig) -> Cost
         tax_estimated=tax_estimated,
         fees_estimated=fees_estimated,
         warnings=warnings,
+    )
+
+
+def calculate_buy_vs_rent(
+    listing: ListingData,
+    costs: CostBreakdown,
+    budget: BudgetConfig,
+) -> BuyVsRentComparison:
+    """
+    NYT-style Buy vs. Rent wealth/net-cost simulation over `budget.hold_years`
+    (with yearly trajectory from Year 1 to max(15, hold_years)).
+
+    Compares:
+    - Buying: upfront down payment + closing costs, monthly P&I (exact amortization),
+      carrying fees + taxes + insurance + maintenance reserve (growing with inflation),
+      tax deductions, rental income offset (for 2-3 unit townhouses), less net home
+      sale proceeds after appreciation & NYC selling costs.
+    - Renting: starting at `budget.current_monthly_rent` (growing at `rent_growth_pct`),
+      while investing the upfront cash & any monthly cash-flow difference at
+      `investment_return_pct` (compounded monthly, with ~20% effective capital gains drag).
+    """
+    hold_years = max(1, min(30, int(budget.hold_years)))
+    max_sim_years = max(15, hold_years)
+    monthly_rate = (budget.interest_rate_pct / 100.0) / 12.0
+    # After-tax compounded monthly investment return (~18% drag on long-term gains/dividends)
+    eff_inv_annual = (budget.investment_return_pct / 100.0) * 0.82
+    inv_monthly = (1.0 + eff_inv_annual) ** (1.0 / 12.0) - 1.0
+
+    appr_rate = budget.home_appreciation_pct / 100.0
+    rent_infl = budget.rent_growth_pct / 100.0
+    sell_pct = budget.selling_cost_pct / 100.0
+    maint_reserve_rate = 0.010 if costs.property_type in ("townhouse", "multifamily") else 0.004
+
+    loan_balance = costs.loan_amount
+    # Portfolio the renter builds by investing upfront cash + monthly cash-flow differences
+    # (negative monthly diff means buyer is cheaper that month -> renter portfolio shrinks)
+    renter_portfolio = costs.estimated_cash_to_close
+    total_buy_outflow = costs.estimated_cash_to_close
+    total_rent_outflow = 0.0
+
+    base_carrying = costs.monthly_hoa_or_maint + costs.monthly_tax + costs.monthly_insurance
+    base_rent = max(0.0, float(budget.current_monthly_rent))
+    base_net_rental_income = costs.estimated_net_rental_income
+    tax_savings_base_ratio = (
+        max(0.0, costs.total_monthly_cost - costs.effective_after_tax_monthly) / costs.total_monthly_cost
+        if costs.total_monthly_cost > 0
+        else 0.0
+    )
+
+    series: list[BuyVsRentPoint] = []
+    breakeven_year: int | None = None
+    hold_buy_net = 0.0
+    hold_rent_net = 0.0
+    hold_buy_adv = 0.0
+
+    for year in range(1, max_sim_years + 1):
+        infl_factor = (1.0 + rent_infl) ** (year - 1)
+        cur_rent = base_rent * infl_factor
+        cur_carrying = base_carrying * infl_factor
+        cur_maint_reserve = (costs.purchase_price * ((1.0 + appr_rate) ** (year - 1)) * maint_reserve_rate) / 12.0
+        cur_rental_offset = base_net_rental_income * infl_factor
+
+        for _ in range(12):
+            interest = loan_balance * monthly_rate if loan_balance > 0 else 0.0
+            principal = max(0.0, min(loan_balance, costs.monthly_mortgage_pi - interest))
+            loan_balance = max(0.0, loan_balance - principal)
+
+            # Rough monthly tax savings scaled by remaining interest share
+            tax_savings = (costs.monthly_mortgage_pi + costs.monthly_tax) * tax_savings_base_ratio * 0.85
+            buy_cash_mo = (
+                costs.monthly_mortgage_pi
+                + cur_carrying
+                + cur_maint_reserve
+                - cur_rental_offset
+                - tax_savings
+            )
+            total_buy_outflow += buy_cash_mo
+            total_rent_outflow += cur_rent
+
+            # Renter compounds portfolio and invests (buy_cash_mo - cur_rent) each month
+            renter_portfolio = renter_portfolio * (1.0 + inv_monthly) + (buy_cash_mo - cur_rent)
+
+        home_value = costs.purchase_price * ((1.0 + appr_rate) ** year)
+        net_sale_proceeds = home_value * (1.0 - sell_pct) - loan_balance
+
+        # Net wealth delta: Buyer ends with `net_sale_proceeds`; Renter ends with `renter_portfolio`
+        # (both paths had the exact same monthly consumption cash budget!).
+        # Express as equivalent "net cost" over the period for intuitive NYT-style comparison:
+        buy_advantage = net_sale_proceeds - renter_portfolio
+        buy_net_cost = total_buy_outflow - net_sale_proceeds
+        rent_net_cost = buy_net_cost + buy_advantage
+
+        if breakeven_year is None and buy_advantage >= 0:
+            breakeven_year = year
+
+        series.append(
+            BuyVsRentPoint(
+                year=year,
+                buy_net_cost=round(buy_net_cost, 0),
+                rent_net_cost=round(rent_net_cost, 0),
+                buy_advantage=round(buy_advantage, 0),
+            )
+        )
+        if year == hold_years:
+            hold_buy_net = buy_net_cost
+            hold_rent_net = rent_net_cost
+            hold_buy_adv = buy_advantage
+
+    # NYT headline equivalent monthly rent:
+    # Current rent + annualized monthly delta needed to make buying & renting break even at hold_years
+    months = hold_years * 12
+    equiv_rent = max(0.0, base_rent - (hold_buy_adv / months))
+
+    if hold_buy_adv >= 25_000:
+        verdict = "BUY_WINS"
+    elif hold_buy_adv <= -25_000:
+        verdict = "RENT_WINS"
+    else:
+        verdict = "CLOSE_CALL"
+
+    return BuyVsRentComparison(
+        hold_years=hold_years,
+        current_monthly_rent=round(base_rent, 0),
+        equivalent_monthly_rent=round(equiv_rent, 0),
+        buy_total_net_cost=round(hold_buy_net, 0),
+        rent_total_net_cost=round(hold_rent_net, 0),
+        net_advantage_buy=round(hold_buy_adv, 0),
+        breakeven_year=breakeven_year,
+        verdict=verdict,
+        yearly_series=series,
     )

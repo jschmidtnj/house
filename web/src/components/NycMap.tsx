@@ -2,6 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import { Layers, TrainFront } from "lucide-react";
 import type { ScoredListing } from "../types";
+import {
+  MTA_COLORS,
+  createClusterPinElement,
+  createClusterTooltipElement,
+  createListingPinElement,
+  createListingTooltipElement,
+  createSubwayPopupElement,
+} from "./mapDom";
 
 interface NycMapProps {
   listings: ScoredListing[];
@@ -89,70 +97,15 @@ const TARGET_HOOD_KEYWORDS = [
   "astoria",
 ];
 
-const MTA_COLORS: Record<string, { bg: string; fg: string }> = {
-  A: { bg: "#2850AD", fg: "#fff" },
-  C: { bg: "#2850AD", fg: "#fff" },
-  E: { bg: "#2850AD", fg: "#fff" },
-  B: { bg: "#FF6319", fg: "#fff" },
-  D: { bg: "#FF6319", fg: "#fff" },
-  F: { bg: "#FF6319", fg: "#fff" },
-  M: { bg: "#FF6319", fg: "#fff" },
-  G: { bg: "#6CBE45", fg: "#fff" },
-  J: { bg: "#996633", fg: "#fff" },
-  Z: { bg: "#996633", fg: "#fff" },
-  L: { bg: "#A7A9AC", fg: "#0f172a" },
-  N: { bg: "#FCCC0A", fg: "#0f172a" },
-  Q: { bg: "#FCCC0A", fg: "#0f172a" },
-  R: { bg: "#FCCC0A", fg: "#0f172a" },
-  W: { bg: "#FCCC0A", fg: "#0f172a" },
-  "1": { bg: "#EE352E", fg: "#fff" },
-  "2": { bg: "#EE352E", fg: "#fff" },
-  "3": { bg: "#EE352E", fg: "#fff" },
-  "4": { bg: "#00933C", fg: "#fff" },
-  "5": { bg: "#00933C", fg: "#fff" },
-  "6": { bg: "#00933C", fg: "#fff" },
-  "7": { bg: "#B933AD", fg: "#fff" },
-  S: { bg: "#808183", fg: "#fff" },
-  PATH: { bg: "#0078C8", fg: "#fff" },
-};
-
 function isTargetHood(name: string): boolean {
   const lower = name.toLowerCase();
   return TARGET_HOOD_KEYWORDS.some((kw) => lower.includes(kw));
 }
 
 function shortHoodLabel(name: string): string {
-  // Trim verbose NTA names like "SoHo-Little Italy-Hudson Square" -> "SoHo / Little Italy"
   const parts = name.split("-").map((s) => s.trim());
   if (parts.length <= 2) return name;
   return `${parts[0]} / ${parts[1]}`;
-}
-
-function pinColor(item: ScoredListing, isSelected: boolean): { bg: string; fg: string } {
-  if (isSelected) return { bg: "#fafafa", fg: "#09090b" };
-  if (!item.passes_filters) return { bg: "#3f3f46", fg: "#d4d4d8" };
-  if (item.score >= 65) return { bg: "#2dd4bf", fg: "#09090b" };
-  if (item.score >= 50) return { bg: "#60a5fa", fg: "#09090b" };
-  return { bg: "#a1a1aa", fg: "#09090b" };
-}
-
-function formatShortMonthly(val: number): string {
-  return `$${(val / 1000).toFixed(1)}k`;
-}
-
-function renderMtaBadges(routes: string[]): string {
-  return routes
-    .map((r) => {
-      const c = MTA_COLORS[r] || { bg: "#64748b", fg: "#fff" };
-      const isWide = r.length > 1;
-      return `<span style="
-        display:inline-flex;align-items:center;justify-content:center;
-        min-width:17px;height:17px;padding:${isWide ? "0 5px" : "0"};border-radius:9999px;
-        background:${c.bg};color:${c.fg};
-        font-size:10px;font-weight:800;margin-right:3px;
-      ">${r}</span>`;
-    })
-    .join("");
 }
 
 export function NycMap({ listings, selectedId, onSelect }: NycMapProps) {
@@ -167,35 +120,34 @@ export function NycMap({ listings, selectedId, onSelect }: NycMapProps) {
   const [style, setStyle] = useState<BasemapStyle>("dark");
   const [showHoods, setShowHoods] = useState(true);
   const [showSubways, setShowSubways] = useState(true);
+  const [zoom, setZoom] = useState<number>(12);
   const [hoodGeo, setHoodGeo] = useState<GeoJSON.FeatureCollection | null>(null);
   const [subwayLinesGeo, setSubwayLinesGeo] = useState<GeoJSON.FeatureCollection | null>(null);
   const [subways, setSubways] = useState<SubwayStation[]>([]);
 
-  // Fetch local static NYC Open Data overlays once
   useEffect(() => {
     fetch("/data/nyc_neighborhoods.geojson?v=2")
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (d) setHoodGeo(d);
       })
-      .catch(() => { });
+      .catch(() => {});
 
     fetch("/data/nyc_subway_lines.geojson")
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (d) setSubwayLinesGeo(d);
       })
-      .catch(() => { });
+      .catch(() => {});
 
     fetch("/data/nyc_subways.json")
       .then((r) => (r.ok ? r.json() : []))
       .then((d) => {
         if (Array.isArray(d)) setSubways(d);
       })
-      .catch(() => { });
+      .catch(() => {});
   }, []);
 
-  // Init Leaflet map
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
@@ -219,12 +171,16 @@ export function NycMap({ listings, selectedId, onSelect }: NycMapProps) {
     markerLayerRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
 
+    const onZoom = () => setZoom(map.getZoom());
+    map.on("zoomend", onZoom);
+
     const ro = new ResizeObserver(() => {
       map.invalidateSize({ animate: false });
     });
     ro.observe(containerRef.current);
 
     return () => {
+      map.off("zoomend", onZoom);
       ro.disconnect();
       map.remove();
       mapRef.current = null;
@@ -236,7 +192,6 @@ export function NycMap({ listings, selectedId, onSelect }: NycMapProps) {
     };
   }, []);
 
-  // Basemap tiles
   useEffect(() => {
     const group = tileGroupRef.current;
     if (!group) return;
@@ -250,12 +205,14 @@ export function NycMap({ listings, selectedId, onSelect }: NycMapProps) {
     }
   }, [style]);
 
-  // Neighborhood boundaries + labels overlay
+  // Neighborhood boundaries + labels (permanent labels hidden when zoomed out <= 11)
   useEffect(() => {
     const group = hoodLayerRef.current;
     if (!group) return;
     group.clearLayers();
     if (!showHoods || !hoodGeo) return;
+
+    const showPermanentLabels = zoom >= 12;
 
     L.geoJSON(hoodGeo, {
       style: (feature) => {
@@ -264,21 +221,22 @@ export function NycMap({ listings, selectedId, onSelect }: NycMapProps) {
         return {
           color: target ? "#60a5fa" : "#3f3f46",
           weight: target ? 1.2 : 0.7,
-          opacity: target ? 0.5 : 0.3,
+          opacity: target ? 0.5 : 0.28,
           fillColor: target ? "#3b82f6" : "#27272a",
           fillOpacity: target ? 0.06 : 0.015,
         };
       },
       onEachFeature: (feature, layer) => {
         const name = String(feature?.properties?.name || "");
+        if (!name) return;
         const target = isTargetHood(name);
-        if (target && name) {
+        if (target && showPermanentLabels) {
           layer.bindTooltip(shortHoodLabel(name), {
             permanent: true,
             direction: "center",
             className: "hood-label hood-label-target",
           });
-        } else if (name) {
+        } else {
           layer.bindTooltip(name, {
             sticky: true,
             direction: "top",
@@ -287,9 +245,9 @@ export function NycMap({ listings, selectedId, onSelect }: NycMapProps) {
         }
       },
     }).addTo(group);
-  }, [showHoods, hoodGeo]);
+  }, [showHoods, hoodGeo, zoom]);
 
-  // MTA Subway track lines overlay
+  // MTA Subway & PATH track lines
   useEffect(() => {
     const group = subwayLineLayerRef.current;
     if (!group) return;
@@ -304,20 +262,21 @@ export function NycMap({ listings, selectedId, onSelect }: NycMapProps) {
         const color = (MTA_COLORS[rt] || { bg: "#94a3b8" }).bg;
         return {
           color,
-          weight: 2.4,
-          opacity: 0.62,
+          weight: zoom <= 11 ? 1.8 : 2.4,
+          opacity: zoom <= 11 ? 0.45 : 0.62,
         };
       },
     }).addTo(group);
-  }, [showSubways, subwayLinesGeo]);
+  }, [showSubways, subwayLinesGeo, zoom]);
 
-  // MTA Subway stations overlay
+  // MTA Subway & PATH station dots (hidden when zoomed far out <= 11)
   useEffect(() => {
     const group = subwayLayerRef.current;
     if (!group) return;
     group.clearLayers();
-    if (!showSubways || subways.length === 0) return;
+    if (!showSubways || subways.length === 0 || zoom <= 11) return;
 
+    const canHover = window.matchMedia("(hover: hover)").matches;
     for (const st of subways) {
       const primaryRoute = st.routes[0] || "";
       const color = (MTA_COLORS[primaryRoute] || { bg: "#94a3b8" }).bg;
@@ -329,85 +288,131 @@ export function NycMap({ listings, selectedId, onSelect }: NycMapProps) {
         fillColor: color,
         fillOpacity: 0.92,
       });
-      const html = `<div style="font-size:12px">
-          <div style="font-weight:700;margin-bottom:4px">🚇 ${st.name}</div>
-          <div>${renderMtaBadges(st.routes)}</div>
-        </div>`;
-      dot.bindPopup(html, { closeButton: false, offset: [0, -4] });
-      if (window.matchMedia("(hover: hover)").matches) {
-        dot.bindTooltip(html, { direction: "top", offset: [0, -6] });
+      dot.bindPopup(() => createSubwayPopupElement(st.name, st.routes), {
+        closeButton: false,
+        offset: [0, -4],
+      });
+      if (canHover) {
+        dot.bindTooltip(() => createSubwayPopupElement(st.name, st.routes), {
+          direction: "top",
+          offset: [0, -6],
+        });
         dot.on("popupopen", () => dot.closeTooltip());
       }
       dot.addTo(group);
     }
-  }, [showSubways, subways]);
+  }, [showSubways, subways, zoom]);
 
-  // Apartment listing markers
+  // Apartment listing markers with progressive zoom-based clustering
   useEffect(() => {
     const layer = markerLayerRef.current;
-    if (!layer) return;
+    const map = mapRef.current;
+    if (!layer || !map) return;
 
     layer.clearLayers();
 
-    for (const item of listings) {
-      const { latitude, longitude } = item.listing;
-      if (latitude == null || longitude == null) continue;
+    const withCoords = listings.filter(
+      (item) => item.listing.latitude != null && item.listing.longitude != null
+    );
 
+    const addSingleMarker = (item: ScoredListing) => {
       const isSelected = item.id === selectedId;
-      const pin = pinColor(item, isSelected);
-      const scale = isSelected ? "scale(1.18)" : "scale(1)";
       const zIndex = isSelected ? 1000 : item.passes_filters ? Math.round(item.score * 5) : 10;
-      const shownMonthly =
-        item.costs.rentable_units > 0 ? item.costs.net_monthly_cost : item.costs.total_monthly_cost;
-
+      const isMulti = item.costs.rentable_units > 0;
+      const pinWidth = isMulti ? 82 : 62;
       const icon = L.divIcon({
         className: "house-pin",
-        html: `<div style="
-          background:${pin.bg};
-          color:${pin.fg};
-          font-weight:700;
-          font-size:11px;
-          padding:3px 8px;
-          border-radius:9999px;
-          border:1.5px solid ${isSelected ? "#3b82f6" : "rgba(9,9,11,0.85)"};
-          box-shadow:0 3px 12px rgba(0,0,0,0.55);
-          white-space:nowrap;
-          transform:${scale};
-          transition:transform 120ms ease;
-        ">${item.costs.rentable_units > 0 ? `${item.costs.num_units}U ` : ""}${formatShortMonthly(shownMonthly)}</div>`,
-        iconSize: [58, 24],
-        iconAnchor: [29, 12],
+        html: createListingPinElement(item, isSelected),
+        iconSize: [pinWidth, 24],
+        iconAnchor: [pinWidth / 2, 12],
       });
-
-      const marker = L.marker([latitude, longitude], { icon, zIndexOffset: zIndex });
-      const unitStr = item.listing.unit ? ` #${item.listing.unit}` : "";
-      const hood = item.listing.neighborhood || item.listing.borough || "NYC";
-      const dti = item.costs.dti_pct != null ? ` • ${item.costs.dti_pct}% DTI` : "";
-      const commuteStr =
-        item.commute_minutes != null
-          ? ` • ${item.commute_mode === "walk" ? "🚶" : "🚇"} ${item.commute_minutes}m Midtown`
-          : "";
-
-      marker.bindTooltip(
-        `<div style="font-size:12px"><strong>${item.listing.address}${unitStr}</strong><br/>${hood} • ${item.listing.beds}bd/${item.listing.baths}ba • $${Math.round(
-          shownMonthly
-        ).toLocaleString()}/mo${dti}${commuteStr} • Score ${item.score}</div>`,
-        { direction: "top", offset: [0, -10] }
-      );
-
+      const marker = L.marker([item.listing.latitude!, item.listing.longitude!], {
+        icon,
+        zIndexOffset: zIndex,
+      });
+      marker.bindTooltip(() => createListingTooltipElement(item), {
+        direction: "top",
+        offset: [0, -10],
+      });
       marker.on("click", () => onSelect(item));
       marker.addTo(layer);
-    }
-  }, [listings, selectedId, onSelect]);
+    };
 
-  // Fly to selected listing
+    if (zoom >= 14) {
+      for (const item of withCoords) addSingleMarker(item);
+      return;
+    }
+
+    // Aggressive pixel clustering at low zooms so pins never pile up
+    const cellPx = zoom <= 10 ? 110 : zoom === 11 ? 90 : zoom === 12 ? 76 : 56;
+    const compactCluster = zoom <= 11;
+    const buckets = new Map<string, ScoredListing[]>();
+
+    for (const item of withCoords) {
+      if (item.id === selectedId) {
+        addSingleMarker(item);
+        continue;
+      }
+      const pt = map.project([item.listing.latitude!, item.listing.longitude!], zoom);
+      const key = `${Math.floor(pt.x / cellPx)}:${Math.floor(pt.y / cellPx)}`;
+      const arr = buckets.get(key) || [];
+      arr.push(item);
+      buckets.set(key, arr);
+    }
+
+    for (const group of buckets.values()) {
+      if (group.length === 1 && !compactCluster) {
+        addSingleMarker(group[0]);
+        continue;
+      }
+      const avgLat = group.reduce((s, i) => s + i.listing.latitude!, 0) / group.length;
+      const avgLng = group.reduce((s, i) => s + i.listing.longitude!, 0) / group.length;
+      const minMonthly = Math.min(
+        ...group.map((i) =>
+          i.costs.rentable_units > 0 ? i.costs.net_monthly_cost : i.costs.total_monthly_cost
+        )
+      );
+      const topScore = Math.max(...group.map((i) => i.score));
+      const accent = topScore >= 65 ? "#2dd4bf" : topScore >= 50 ? "#60a5fa" : "#a1a1aa";
+
+      const clusterIcon = L.divIcon({
+        className: "house-pin",
+        html: createClusterPinElement(group.length, minMonthly, accent, compactCluster),
+        iconSize: compactCluster ? [30, 30] : [86, 26],
+        iconAnchor: compactCluster ? [15, 15] : [43, 13],
+      });
+
+      const marker = L.marker([avgLat, avgLng], {
+        icon: clusterIcon,
+        zIndexOffset: 200 + group.length,
+      });
+      marker.bindTooltip(() => createClusterTooltipElement(group.length, minMonthly, topScore), {
+        direction: "top",
+        offset: [0, -10],
+      });
+      marker.on("click", () => {
+        if (group.length === 1) {
+          onSelect(group[0]);
+          return;
+        }
+        const bounds = L.latLngBounds(
+          group.map((i) => [i.listing.latitude!, i.listing.longitude!] as [number, number])
+        );
+        map.flyToBounds(bounds.pad(0.25), { maxZoom: Math.max(zoom + 2, 15), duration: 0.45 });
+      });
+      marker.addTo(layer);
+    }
+  }, [listings, selectedId, onSelect, zoom]);
+
   useEffect(() => {
     if (!selectedId || !mapRef.current) return;
     const target = listings.find((l) => l.id === selectedId);
     if (target?.listing.latitude != null && target?.listing.longitude != null) {
-      mapRef.current.flyTo([target.listing.latitude, target.listing.longitude], Math.max(mapRef.current.getZoom(), 14), {
-        duration: 0.55,
-      });
+      mapRef.current.flyTo(
+        [target.listing.latitude, target.listing.longitude],
+        Math.max(mapRef.current.getZoom(), 14),
+        { duration: 0.55 }
+      );
     }
   }, [selectedId, listings]);
 
@@ -415,24 +420,26 @@ export function NycMap({ listings, selectedId, onSelect }: NycMapProps) {
     <div className="relative h-full w-full overflow-hidden rounded-xl border border-zinc-800">
       <div ref={containerRef} className="h-full w-full" />
 
-      {/* Top-Right Controls: Overlays + Basemap Switcher */}
+      {/* Top-Right Controls */}
       <div className="absolute right-3 top-3 z-[400] flex flex-wrap items-center justify-end gap-1.5">
         <button
           onClick={() => setShowHoods((v) => !v)}
-          className={`flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[11px] font-medium backdrop-blur transition ${showHoods
-            ? "border-blue-500/50 bg-zinc-900/90 text-blue-300"
-            : "border-zinc-800 bg-zinc-950/85 text-zinc-400 hover:text-zinc-200"
-            }`}
+          className={`flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[11px] font-medium backdrop-blur transition ${
+            showHoods
+              ? "border-blue-500/50 bg-zinc-900/90 text-blue-300"
+              : "border-zinc-800 bg-zinc-950/85 text-zinc-400 hover:text-zinc-200"
+          }`}
         >
           <Layers className="h-3 w-3" /> Neighborhoods
         </button>
 
         <button
           onClick={() => setShowSubways((v) => !v)}
-          className={`flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[11px] font-medium backdrop-blur transition ${showSubways
-            ? "border-blue-500/50 bg-zinc-900/90 text-blue-300"
-            : "border-zinc-800 bg-zinc-950/85 text-zinc-400 hover:text-zinc-200"
-            }`}
+          className={`flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[11px] font-medium backdrop-blur transition ${
+            showSubways
+              ? "border-blue-500/50 bg-zinc-900/90 text-blue-300"
+              : "border-zinc-800 bg-zinc-950/85 text-zinc-400 hover:text-zinc-200"
+          }`}
         >
           <TrainFront className="h-3 w-3" /> Subways
         </button>
@@ -442,10 +449,9 @@ export function NycMap({ listings, selectedId, onSelect }: NycMapProps) {
             <button
               key={key}
               onClick={() => setStyle(key)}
-              className={`rounded-md px-2 py-1 font-medium transition ${style === key
-                ? "bg-zinc-800 text-zinc-100"
-                : "text-zinc-400 hover:text-zinc-200"
-                }`}
+              className={`rounded-md px-2 py-1 font-medium transition ${
+                style === key ? "bg-zinc-800 text-zinc-100" : "text-zinc-400 hover:text-zinc-200"
+              }`}
             >
               {BASEMAPS[key].label}
             </button>

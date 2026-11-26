@@ -14,6 +14,11 @@ export interface BudgetConfig {
   est_rent_per_unit: number;
   rental_net_factor: number;
   use_net_rental_for_filter: boolean;
+  current_monthly_rent: number;
+  hold_years: number;
+  home_appreciation_pct: number;
+  rent_growth_pct: number;
+  investment_return_pct: number;
 }
 
 export interface SearchConfig {
@@ -99,6 +104,25 @@ export interface ListingItem {
   description: string;
 }
 
+export interface BuyVsRentPoint {
+  year: number;
+  buy_net_cost: number;
+  rent_net_cost: number;
+  buy_advantage: number;
+}
+
+export interface BuyVsRentComparison {
+  hold_years: number;
+  current_monthly_rent: number;
+  equivalent_monthly_rent: number;
+  buy_total_net_cost: number;
+  rent_total_net_cost: number;
+  net_advantage_buy: number;
+  breakeven_year: number | null;
+  verdict: "BUY_WINS" | "CLOSE_CALL" | "RENT_WINS";
+  yearly_series: BuyVsRentPoint[];
+}
+
 export interface ScoredListing {
   id: number;
   canonical_key: string;
@@ -115,6 +139,7 @@ export interface ScoredListing {
   nearest_station: string;
   nearest_routes: string[];
   walk_to_station_min: number | null;
+  buy_vs_rent?: BuyVsRentComparison | null;
   listing: ListingItem;
   costs: CostBreakdown;
 }
@@ -143,6 +168,11 @@ export interface KnobsState {
   use_after_tax_for_filter: boolean;
   est_rent_per_unit: number;
   use_net_rental_for_filter: boolean;
+  current_monthly_rent: number;
+  hold_years: number;
+  home_appreciation_pct: number;
+  rent_growth_pct: number;
+  investment_return_pct: number;
   min_units: number;
   min_beds: number;
   min_sqft: number;

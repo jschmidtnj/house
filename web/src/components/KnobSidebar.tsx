@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Folder, Heart, Plus, RotateCcw, Sliders, Trash2, X } from "lucide-react";
 import type { KnobsState } from "../types";
+import { InfoTip } from "./InfoTip";
 
 interface KnobSidebarProps {
   knobs: KnobsState;
@@ -15,6 +16,13 @@ interface KnobSidebarProps {
   onSelectList: (name: string | null) => void;
   onCreateList: (name: string) => void;
   onDeleteList: (name: string) => void;
+  availableBoroughs: { name: string; count: number }[];
+  selectedBoroughs: string[];
+  onToggleBorough: (name: string) => void;
+  availableNeighborhoods: { name: string; count: number }[];
+  selectedNeighborhoods: string[];
+  onToggleNeighborhood: (name: string) => void;
+  onClearLocations: () => void;
 }
 
 const ALL_TYPES = ["condo", "coop", "condop", "townhouse", "multifamily"];
@@ -32,8 +40,16 @@ export function KnobSidebar({
   onSelectList,
   onCreateList,
   onDeleteList,
+  availableBoroughs,
+  selectedBoroughs,
+  onToggleBorough,
+  availableNeighborhoods,
+  selectedNeighborhoods,
+  onToggleNeighborhood,
+  onClearLocations,
 }: KnobSidebarProps) {
   const [newListName, setNewListName] = useState("");
+  const [hoodSearch, setHoodSearch] = useState("");
   const grossMonthlyIncome = knobs.annual_income > 0 ? knobs.annual_income / 12 : 0;
   const targetDti = grossMonthlyIncome > 0 ? (knobs.max_monthly_cost / grossMonthlyIncome) * 100 : 0;
 
@@ -176,7 +192,13 @@ export function KnobSidebar({
       {/* Primary Knob: Max Monthly Cost */}
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-3.5">
         <div className="flex items-baseline justify-between">
-          <label className="text-xs font-medium text-zinc-300">Max Monthly Cost</label>
+          <label className="flex items-center text-xs font-medium text-zinc-300">
+            Max Monthly Cost
+            <InfoTip
+              align="left"
+              text="All-in monthly housing cost: Mortgage P&I + Maintenance/HOA + Property Tax + Insurance (minus 85% net rent for 2–3 unit townhouses). DTI = Monthly Cost ÷ Gross Monthly Salary; NYC co-op boards usually cap DTI at ≤28%."
+            />
+          </label>
           <span className="text-base font-semibold text-zinc-50">
             ${knobs.max_monthly_cost.toLocaleString()}/mo
           </span>
@@ -302,7 +324,13 @@ export function KnobSidebar({
       {/* Max Commute to Midtown */}
       <div className="space-y-1">
         <div className="flex justify-between text-xs">
-          <span className="text-zinc-400">Max Commute (Midtown)</span>
+          <span className="flex items-center text-zinc-400">
+            Max Commute (Midtown)
+            <InfoTip
+              align="left"
+              text="Estimated door-to-door time to Midtown Core (Bryant Park / Grand Central): compares direct walk vs. walking to the best nearby MTA/PATH station + wait + subway ride (+6m if transfer needed)."
+            />
+          </span>
           <span className="font-medium text-zinc-100">
             {knobs.max_commute_minutes > 0 ? `≤ ${knobs.max_commute_minutes} min` : "Any"}
           </span>
@@ -327,7 +355,13 @@ export function KnobSidebar({
       {/* Max Walk to PATH (Jersey City / Hoboken) */}
       <div className="space-y-1">
         <div className="flex justify-between text-xs">
-          <span className="text-zinc-400">NJ Walk to PATH</span>
+          <span className="flex items-center text-zinc-400">
+            NJ Walk to PATH
+            <InfoTip
+              align="left"
+              text="For Jersey City & Hoboken listings only: filters out places farther than this walking time from the nearest PATH station (Hoboken, Newport, Grove St, Exchange Pl, or Journal Sq)."
+            />
+          </span>
           <span className="font-medium text-zinc-100">
             {knobs.nj_max_walk_to_path_min > 0 ? `≤ ${knobs.nj_max_walk_to_path_min} min` : "Any"}
           </span>
@@ -348,6 +382,80 @@ export function KnobSidebar({
           <span>25m</span>
         </div>
       </div>
+
+      {/* Borough & Neighborhood Filter */}
+      {(availableBoroughs.length > 0 || availableNeighborhoods.length > 0) && (
+        <div className="space-y-2 rounded-xl border border-zinc-800 bg-zinc-900/50 p-3">
+          <div className="flex items-center justify-between text-xs font-medium text-zinc-200">
+            <span>Areas &amp; Neighborhoods</span>
+            {(selectedBoroughs.length > 0 || selectedNeighborhoods.length > 0) && (
+              <button
+                onClick={onClearLocations}
+                className="text-[11px] text-blue-400 hover:text-blue-300"
+              >
+                Clear ({selectedBoroughs.length + selectedNeighborhoods.length})
+              </button>
+            )}
+          </div>
+
+          {availableBoroughs.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {availableBoroughs.map((b) => {
+                const active = selectedBoroughs.includes(b.name);
+                return (
+                  <button
+                    key={b.name}
+                    onClick={() => onToggleBorough(b.name)}
+                    className={`rounded-md border px-2 py-0.5 text-[11px] font-medium transition ${
+                      active
+                        ? "border-blue-500/60 bg-blue-500/15 text-blue-200"
+                        : "border-zinc-800 bg-zinc-950/70 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"
+                    }`}
+                  >
+                    {b.name} <span className="text-[10px] opacity-60">{b.count}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {availableNeighborhoods.length > 0 && (
+            <>
+              <input
+                type="text"
+                placeholder="Search neighborhoods..."
+                value={hoodSearch}
+                onChange={(e) => setHoodSearch(e.target.value)}
+                className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-2.5 py-1 text-[11px] text-zinc-100 placeholder:text-zinc-500 focus:border-blue-500 focus:outline-none"
+              />
+              <div className="flex max-h-36 flex-wrap gap-1 overflow-y-auto pr-0.5">
+                {availableNeighborhoods
+                  .filter(
+                    (h) =>
+                      !hoodSearch.trim() ||
+                      h.name.toLowerCase().includes(hoodSearch.trim().toLowerCase())
+                  )
+                  .map((h) => {
+                    const active = selectedNeighborhoods.includes(h.name);
+                    return (
+                      <button
+                        key={h.name}
+                        onClick={() => onToggleNeighborhood(h.name)}
+                        className={`rounded-full border px-2 py-0.5 text-[10px] font-medium transition ${
+                          active
+                            ? "border-blue-500/60 bg-blue-500/20 text-blue-200"
+                            : "border-zinc-800 bg-zinc-950/60 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"
+                        }`}
+                      >
+                        {h.name} <span className="opacity-60">{h.count}</span>
+                      </button>
+                    );
+                  })}
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Property Types */}
       <div className="space-y-1.5">
@@ -375,7 +483,13 @@ export function KnobSidebar({
       {/* 2-3 Unit Townhouse House-Hacking Controls */}
       <div className="space-y-2.5 rounded-xl border border-zinc-800 bg-zinc-900/50 p-3">
         <div className="flex items-center justify-between text-xs font-medium text-zinc-200">
-          <span>2–3 Unit Rental Offset</span>
+          <span className="flex items-center">
+            2–3 Unit Rental Offset
+            <InfoTip
+              align="left"
+              text="Models house hacking a 2–3 family townhouse: live in 1 unit and rent out the other (N − 1) units. Applies an 85% net factor to cover vacancy and landlord repairs."
+            />
+          </span>
           <button
             onClick={() =>
               onChange({
@@ -426,10 +540,108 @@ export function KnobSidebar({
         </label>
       </div>
 
+      {/* NYT-Style Buy vs. Rent Assumptions */}
+      <div className="space-y-2.5 rounded-xl border border-zinc-800 bg-zinc-900/50 p-3">
+        <div className="flex items-center text-xs font-medium text-zinc-200">
+          Buy vs. Rent Benchmark
+          <InfoTip
+            align="left"
+            text="NYT-style net wealth comparison: pits total ownership cost (down payment opportunity cost, mortgage amortization, taxes, fees, appreciation, 6.5% NYC selling costs) against renting and investing the difference."
+          />
+        </div>
+
+        <div className="space-y-1">
+          <div className="flex justify-between text-xs">
+            <span className="text-zinc-400">Current Rent</span>
+            <span className="font-medium text-zinc-100">
+              ${knobs.current_monthly_rent.toLocaleString()}/mo
+            </span>
+          </div>
+          <input
+            type="range"
+            min={2500}
+            max={10000}
+            step={100}
+            value={knobs.current_monthly_rent}
+            onChange={(e) => set("current_monthly_rent", Number(e.target.value))}
+            className="w-full accent-blue-400"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-2.5">
+          <div className="space-y-1">
+            <div className="flex justify-between text-[11px]">
+              <span className="text-zinc-400">Hold</span>
+              <span className="font-medium text-zinc-100">{knobs.hold_years} yrs</span>
+            </div>
+            <input
+              type="range"
+              min={3}
+              max={15}
+              step={1}
+              value={knobs.hold_years}
+              onChange={(e) => set("hold_years", Number(e.target.value))}
+              className="w-full accent-blue-400"
+            />
+          </div>
+          <div className="space-y-1">
+            <div className="flex justify-between text-[11px]">
+              <span className="text-zinc-400">Home +%/yr</span>
+              <span className="font-medium text-zinc-100">{knobs.home_appreciation_pct.toFixed(1)}%</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={6}
+              step={0.5}
+              value={knobs.home_appreciation_pct}
+              onChange={(e) => set("home_appreciation_pct", Number(e.target.value))}
+              className="w-full accent-blue-400"
+            />
+          </div>
+          <div className="space-y-1">
+            <div className="flex justify-between text-[11px]">
+              <span className="text-zinc-400">Rent +%/yr</span>
+              <span className="font-medium text-zinc-100">{knobs.rent_growth_pct.toFixed(1)}%</span>
+            </div>
+            <input
+              type="range"
+              min={1}
+              max={6}
+              step={0.5}
+              value={knobs.rent_growth_pct}
+              onChange={(e) => set("rent_growth_pct", Number(e.target.value))}
+              className="w-full accent-blue-400"
+            />
+          </div>
+          <div className="space-y-1">
+            <div className="flex justify-between text-[11px]">
+              <span className="text-zinc-400">Market %</span>
+              <span className="font-medium text-zinc-100">{knobs.investment_return_pct.toFixed(1)}%</span>
+            </div>
+            <input
+              type="range"
+              min={3}
+              max={11}
+              step={0.5}
+              value={knobs.investment_return_pct}
+              onChange={(e) => set("investment_return_pct", Number(e.target.value))}
+              className="w-full accent-blue-400"
+            />
+          </div>
+        </div>
+      </div>
+
       {/* Toggles */}
       <div className="space-y-2 border-t border-zinc-800/80 pt-3 text-xs">
         <label className="flex cursor-pointer items-center justify-between text-zinc-300">
-          <span>Exclude HDFC Income-Cap</span>
+          <span className="flex items-center">
+            Exclude HDFC Income-Cap
+            <InfoTip
+              align="left"
+              text="Filters out NYC HDFC & Mitchell-Lama income-restricted co-ops, which enforce strict household income caps (typically 120%–165% AMI)."
+            />
+          </span>
           <input
             type="checkbox"
             checked={knobs.exclude_hdfc}

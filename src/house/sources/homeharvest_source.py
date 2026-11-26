@@ -16,6 +16,7 @@ from house.sources.base import (
     parse_currency,
     parse_int,
     sanitize_baths,
+    sanitize_property_type_and_units,
 )
 
 logger = logging.getLogger(__name__)
@@ -128,6 +129,23 @@ def parse_homeharvest_row(row: dict[str, Any]) -> ListingData | None:
 
     beds = parse_currency(_clean_val(row.get("beds"))) or 0.0
     sqft = parse_int(_clean_val(row.get("sqft")))
+    if sqft is not None and sqft < 100:
+        sqft = None
+
+    ptype, num_units = sanitize_property_type_and_units(
+        ptype,
+        num_units,
+        unit=unit,
+        beds=beds,
+        baths=baths,
+        monthly_hoa=monthly_hoa,
+        monthly_maintenance=monthly_maint,
+        description=description,
+    )
+    if ptype == "coop" and monthly_maint is None and monthly_hoa is not None:
+        monthly_maint = monthly_hoa
+        monthly_hoa = None
+        monthly_tax = None
     dom = parse_int(_clean_val(row.get("days_on_mls")))
     url = str(_clean_val(row.get("property_url")) or "").strip()
     ext_id = str(_clean_val(row.get("property_id")) or _clean_val(row.get("mls_id")) or url or f"{street}:{unit}")

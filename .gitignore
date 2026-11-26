@@ -229,8 +229,11 @@ data/*.lock
 data/imports/*.json
 data/imports/*.csv
 data/imports/*.yaml
+
+# Website
 web/node_modules/
 web/dist/
+.pnpm-store/
 
-# Mac stuff
+# Mac
 .DS_Store

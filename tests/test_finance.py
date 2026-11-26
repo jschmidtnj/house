@@ -131,3 +131,43 @@ def test_multifamily_townhouse_rental_offset():
     assert costs.estimated_net_rental_income == 5_440.0
     assert costs.net_monthly_cost < costs.total_monthly_cost - 5_000.0
     assert costs.monthly_hoa_or_maint == 0.0
+
+
+def test_nyt_buy_vs_rent_comparison():
+    from house.finance import calculate_buy_vs_rent
+
+    budget = BudgetConfig(
+        annual_income=300_000,
+        down_payment_pct=20.0,
+        interest_rate_pct=6.5,
+        current_monthly_rent=5_300.0,
+        hold_years=7,
+        home_appreciation_pct=3.0,
+        rent_growth_pct=3.5,
+        investment_return_pct=7.0,
+    )
+    cheap_coop = ListingData(
+        source="test",
+        external_id="bvr-1",
+        address="100 Main St",
+        property_type="coop",
+        price=600_000,
+        monthly_maintenance=1_200,
+    )
+    expensive_condo = ListingData(
+        source="test",
+        external_id="bvr-2",
+        address="200 Park Ave",
+        property_type="condo",
+        price=1_850_000,
+        monthly_hoa=1_800,
+        monthly_tax=1_600,
+    )
+    bvr_cheap = calculate_buy_vs_rent(cheap_coop, calculate_cost_breakdown(cheap_coop, budget), budget)
+    bvr_exp = calculate_buy_vs_rent(expensive_condo, calculate_cost_breakdown(expensive_condo, budget), budget)
+
+    assert len(bvr_cheap.yearly_series) >= 15
+    assert bvr_cheap.equivalent_monthly_rent < 5_300.0
+    assert bvr_cheap.net_advantage_buy > 0
+    assert bvr_exp.equivalent_monthly_rent > 5_300.0
+    assert bvr_exp.verdict == "RENT_WINS"

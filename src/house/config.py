@@ -41,6 +41,12 @@ class BudgetConfig:
     rental_net_factor: float = 0.85
     use_net_rental_for_filter: bool = True
     townhouse_insurance_monthly: float = 275.0
+    current_monthly_rent: float = 5_300.0
+    hold_years: int = 7
+    home_appreciation_pct: float = 3.0
+    rent_growth_pct: float = 3.5
+    investment_return_pct: float = 7.0
+    selling_cost_pct: float = 6.5
 
 
 @dataclass

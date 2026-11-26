@@ -41,3 +41,12 @@ coop_tax_deductible_pct: 0.45
 est_rent_per_unit: 3200.0         # Estimated gross monthly rent per extra unit (units 2, 3, ...)
 rental_net_factor: 0.85           # Keep 85% of gross rent after vacancy/repairs (lenders credit ~75%)
 use_net_rental_for_filter: true   # Filter 2-3 unit townhouses using net out-of-pocket monthly cost
+
+# NYT-style Buy vs. Rent comparison assumptions
+current_monthly_rent: 5300.0      # Your current rent ($5.3k/mo 2b2b luxury apartment)
+hold_years: 7                     # Expected holding period in years
+home_appreciation_pct: 3.0        # Annual NYC home price growth (%)
+rent_growth_pct: 3.5              # Annual NYC rent & carrying-cost inflation (%)
+investment_return_pct: 7.0        # Expected annual return if down payment & savings stay invested (%)
+selling_cost_pct: 6.5             # NYC seller closing costs (broker + transfer/flip taxes)
+
