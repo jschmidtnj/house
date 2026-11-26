@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Folder, Heart, Plus, RotateCcw, Sliders, Trash2, X } from "lucide-react";
+import { EyeOff, Folder, Heart, Plus, RotateCcw, Sliders, Trash2, X } from "lucide-react";
 import { PROPERTY_TYPES } from "../config";
 import type { KnobsState } from "../types";
 import { InfoTip } from "./InfoTip";
@@ -12,8 +12,9 @@ interface KnobSidebarProps {
   isMobile?: boolean;
   onClose?: () => void;
   savedCount: number;
+  hiddenCount: number;
   customLists: Record<string, number[]>;
-  activeList: string | null; // null = All, "__favorites__" = Favorites, else custom list name
+  activeList: string | null; // null = All, "__favorites__" = Favorites, "__hidden__" = Hidden, else custom list name
   onSelectList: (name: string | null) => void;
   onCreateList: (name: string) => void;
   onDeleteList: (name: string) => void;
@@ -36,6 +37,7 @@ export function KnobSidebar({
   isMobile = false,
   onClose,
   savedCount,
+  hiddenCount,
   customLists,
   activeList,
   onSelectList,
@@ -128,6 +130,21 @@ export function KnobSidebar({
               Favorites
             </span>
             <span className="text-[11px] text-zinc-500">{savedCount}</span>
+          </button>
+
+          <button
+            onClick={() => onSelectList(activeList === "__hidden__" ? null : "__hidden__")}
+            className={`flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left transition ${
+              activeList === "__hidden__"
+                ? "bg-zinc-800 font-medium text-zinc-100"
+                : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
+            }`}
+          >
+            <span className="flex items-center gap-1.5">
+              <EyeOff className="h-3.5 w-3.5" />
+              Hidden
+            </span>
+            <span className="text-[11px] text-zinc-500">{hiddenCount}</span>
           </button>
 
           {Object.entries(customLists).map(([name, ids]) => {

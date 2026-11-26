@@ -1,4 +1,4 @@
-import { Heart, Scale } from "lucide-react";
+import { Eye, EyeOff, Heart, Scale } from "lucide-react";
 import type { ScoredListing } from "../types";
 import { HoverTip } from "./InfoTip";
 import { SearchAutocomplete } from "./SearchAutocomplete";
@@ -11,6 +11,7 @@ interface ListingsFeedProps {
   rightPanelWidth: number;
   selectedId: number | null;
   savedIds: number[];
+  hiddenIds: number[];
   pinnedIds: number[];
   useNetRental: boolean;
   searchQuery: string;
@@ -18,6 +19,7 @@ interface ListingsFeedProps {
   onSelectListing: (item: ScoredListing) => void;
   onSelectNeighborhood: (hood: string) => void;
   onToggleSave: (id: number) => void;
+  onToggleHide: (id: number) => void;
   onTogglePin: (id: number) => void;
 }
 
@@ -29,6 +31,7 @@ export function ListingsFeed({
   rightPanelWidth,
   selectedId,
   savedIds,
+  hiddenIds,
   pinnedIds,
   useNetRental,
   searchQuery,
@@ -36,6 +39,7 @@ export function ListingsFeed({
   onSelectListing,
   onSelectNeighborhood,
   onToggleSave,
+  onToggleHide,
   onTogglePin,
 }: ListingsFeedProps) {
   return (
@@ -66,6 +70,7 @@ export function ListingsFeed({
           const active = item.id === selectedId;
           const pinned = pinnedIds.includes(item.id);
           const saved = savedIds.includes(item.id);
+          const hidden = hiddenIds.includes(item.id);
           const shownMo =
             c.rentable_units > 0 && useNetRental ? c.net_monthly_cost : c.total_monthly_cost;
 
@@ -187,6 +192,20 @@ export function ListingsFeed({
                       }`}
                     >
                       <Scale className="h-3.5 w-3.5" />
+                    </button>
+                  </HoverTip>
+                  <HoverTip text={hidden ? "Unhide listing" : "Hide listing"}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleHide(item.id);
+                      }}
+                      className={`rounded p-1 ${
+                        hidden ? "text-amber-300" : "text-zinc-500 hover:text-zinc-300"
+                      }`}
+                      aria-label={hidden ? "Unhide listing" : "Hide listing"}
+                    >
+                      {hidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
                     </button>
                   </HoverTip>
                 </div>

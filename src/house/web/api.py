@@ -299,6 +299,30 @@ def create_app(config_path: str | Path = "config/default.yaml") -> FastAPI:
             db.set_bot_state("saved_listing_ids", json.dumps(sorted_ids))
         return {"listing_id": listing_id, "saved": saved, "saved_ids": sorted_ids}
 
+    @app.get("/api/hidden")
+    def get_hidden() -> dict[str, Any]:
+        cfg = load_config(cfg_path)
+        with Database(cfg.database_path) as db:
+            raw = db.get_bot_state("hidden_listing_ids")
+        ids = sorted({int(x) for x in json.loads(raw or "[]") if str(x).isdigit()})
+        return {"hidden_ids": ids}
+
+    @app.post("/api/hidden/{listing_id}")
+    def toggle_hidden(listing_id: int) -> dict[str, Any]:
+        cfg = load_config(cfg_path)
+        with Database(cfg.database_path) as db:
+            raw = db.get_bot_state("hidden_listing_ids")
+            ids = {int(x) for x in json.loads(raw or "[]") if str(x).isdigit()}
+            if listing_id in ids:
+                ids.remove(listing_id)
+                hidden = False
+            else:
+                ids.add(listing_id)
+                hidden = True
+            sorted_ids = sorted(ids)
+            db.set_bot_state("hidden_listing_ids", json.dumps(sorted_ids))
+        return {"listing_id": listing_id, "hidden": hidden, "hidden_ids": sorted_ids}
+
     def _load_custom_lists(db: Database) -> dict[str, list[int]]:
         raw = db.get_bot_state("custom_lists")
         data = json.loads(raw or "{}")

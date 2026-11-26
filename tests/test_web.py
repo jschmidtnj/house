@@ -52,6 +52,16 @@ def test_web_api_config_rank_and_detail(tmp_path: Path):
     assert r_unsave.json()["saved"] is False
     assert first_id not in client.get("/api/saved").json()["saved_ids"]
 
+    # Test hide / unhide persistence
+    r_hide = client.post(f"/api/hidden/{first_id}")
+    assert r_hide.status_code == 200
+    assert r_hide.json()["hidden"] is True
+    assert first_id in client.get("/api/hidden").json()["hidden_ids"]
+
+    r_unhide = client.post(f"/api/hidden/{first_id}")
+    assert r_unhide.json()["hidden"] is False
+    assert first_id not in client.get("/api/hidden").json()["hidden_ids"]
+
 
     # Test custom lists CRUD + toggle membership
     r_create = client.post("/api/lists", json={"name": "Tour Weekend"})

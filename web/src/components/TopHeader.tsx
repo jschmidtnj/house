@@ -132,7 +132,9 @@ export function TopHeader({
             className="hidden items-center gap-1 rounded-lg border border-blue-500/50 bg-blue-500/15 px-2 py-1.5 text-xs font-medium text-blue-200 sm:flex"
             title="Click to clear list filter"
           >
-            <span className="max-w-[110px] truncate">{activeList}</span>
+            <span className="max-w-[110px] truncate">
+              {activeList === "__hidden__" ? "Hidden" : activeList}
+            </span>
             <span className="text-[10px] text-blue-300">×</span>
           </button>
         )}

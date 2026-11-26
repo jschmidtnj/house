@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 export function useLists() {
   const [savedIds, setSavedIds] = useState<number[]>([]);
+  const [hiddenIds, setHiddenIds] = useState<number[]>([]);
   const [customLists, setCustomLists] = useState<Record<string, number[]>>({});
   const [activeList, setActiveList] = useState<string | null>(null);
 
@@ -10,6 +11,13 @@ export function useLists() {
       .then((r) => (r.ok ? r.json() : { saved_ids: [] }))
       .then((d) => {
         if (Array.isArray(d.saved_ids)) setSavedIds(d.saved_ids);
+      })
+      .catch(() => {});
+
+    fetch("/api/hidden")
+      .then((r) => (r.ok ? r.json() : { hidden_ids: [] }))
+      .then((d) => {
+        if (Array.isArray(d.hidden_ids)) setHiddenIds(d.hidden_ids);
       })
       .catch(() => {});
 
@@ -28,6 +36,19 @@ export function useLists() {
       if (resp.ok) {
         const data = await resp.json();
         if (Array.isArray(data.saved_ids)) setSavedIds(data.saved_ids);
+      }
+    } catch {
+      // Keep optimistic state
+    }
+  };
+
+  const toggleHide = async (id: number) => {
+    setHiddenIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    try {
+      const resp = await fetch(`/api/hidden/${id}`, { method: "POST" });
+      if (resp.ok) {
+        const data = await resp.json();
+        if (Array.isArray(data.hidden_ids)) setHiddenIds(data.hidden_ids);
       }
     } catch {
       // Keep optimistic state
@@ -108,10 +129,12 @@ export function useLists() {
 
   return {
     savedIds,
+    hiddenIds,
     customLists,
     activeList,
     setActiveList,
     toggleSave,
+    toggleHide,
     createCustomList,
     toggleInCustomList,
     deleteCustomList,

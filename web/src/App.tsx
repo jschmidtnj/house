@@ -55,10 +55,12 @@ export function App() {
 
   const {
     savedIds,
+    hiddenIds,
     customLists,
     activeList,
     setActiveList,
     toggleSave,
+    toggleHide,
     createCustomList,
     toggleInCustomList,
     deleteCustomList,
@@ -225,11 +227,18 @@ export function App() {
 
   const listings = useMemo(() => {
     let out = allListings;
-    if (activeList === "__favorites__") {
-      out = out.filter((l) => savedIds.includes(l.id));
-    } else if (activeList && customLists[activeList]) {
-      const ids = customLists[activeList];
-      out = out.filter((l) => ids.includes(l.id));
+    if (activeList === "__hidden__") {
+      out = out.filter((l) => hiddenIds.includes(l.id));
+    } else {
+      if (hiddenIds.length > 0) {
+        out = out.filter((l) => !hiddenIds.includes(l.id));
+      }
+      if (activeList === "__favorites__") {
+        out = out.filter((l) => savedIds.includes(l.id));
+      } else if (activeList && customLists[activeList]) {
+        const ids = customLists[activeList];
+        out = out.filter((l) => ids.includes(l.id));
+      }
     }
     if (selectedBoroughs.length > 0) {
       out = out.filter((l) => selectedBoroughs.includes(l.listing.borough));
@@ -252,7 +261,7 @@ export function App() {
       );
     }
     return out;
-  }, [allListings, activeList, savedIds, customLists, selectedBoroughs, selectedNeighborhoods, knobs.search_query]);
+  }, [allListings, activeList, savedIds, hiddenIds, customLists, selectedBoroughs, selectedNeighborhoods, knobs.search_query]);
 
   useEffect(() => {
     if (selectedId == null || allListings.some((l) => l.id === selectedId)) {
@@ -303,12 +312,21 @@ export function App() {
     setSelectedNeighborhoods([]);
   };
 
+  const handleToggleHide = (id: number) => {
+    const willHide = !hiddenIds.includes(id);
+    toggleHide(id);
+    if (willHide && activeList !== "__hidden__" && selectedId === id) {
+      setSelectedId(null);
+    }
+  };
+
   const sidebarProps = {
     knobs,
     onChange: setKnobs,
     onReset: resetAll,
     width: leftSidebarWidth,
     savedCount: savedIds.length,
+    hiddenCount: hiddenIds.length,
     customLists,
     activeList,
     onCreateList: (name: string) => createCustomList(name),
@@ -334,6 +352,7 @@ export function App() {
       rightPanelWidth={rightPanelWidth}
       selectedId={selectedId}
       savedIds={savedIds}
+      hiddenIds={hiddenIds}
       pinnedIds={pinnedIds}
       useNetRental={knobs.use_net_rental_for_filter}
       searchQuery={knobs.search_query}
@@ -341,6 +360,7 @@ export function App() {
       onSelectListing={(item) => setSelectedId(item.id)}
       onSelectNeighborhood={addNeighborhood}
       onToggleSave={toggleSave}
+      onToggleHide={handleToggleHide}
       onTogglePin={togglePin}
     />
   );
@@ -484,6 +504,8 @@ export function App() {
         onTogglePin={togglePin}
         isSaved={selectedId != null && savedIds.includes(selectedId)}
         onToggleSave={toggleSave}
+        isHidden={selectedId != null && hiddenIds.includes(selectedId)}
+        onToggleHide={handleToggleHide}
         customLists={customLists}
         onToggleInList={toggleInCustomList}
         onCreateList={createCustomList}

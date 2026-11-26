@@ -1,5 +1,19 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, Check, ExternalLink, FolderPlus, Heart, Link2, Maximize2, Minimize2, Plus, Scale, X } from "lucide-react";
+import {
+  AlertTriangle,
+  Check,
+  ExternalLink,
+  Eye,
+  EyeOff,
+  FolderPlus,
+  Heart,
+  Link2,
+  Maximize2,
+  Minimize2,
+  Plus,
+  Scale,
+  X,
+} from "lucide-react";
 import {
   CartesianGrid,
   Line,
@@ -21,6 +35,8 @@ interface ListingDrawerProps {
   onTogglePin: (id: number) => void;
   isSaved: boolean;
   onToggleSave: (id: number) => void;
+  isHidden: boolean;
+  onToggleHide: (id: number) => void;
   customLists: Record<string, number[]>;
   onToggleInList: (listName: string, id: number) => void;
   onCreateList: (listName: string, initialId?: number) => void;
@@ -33,6 +49,8 @@ export function ListingDrawer({
   onTogglePin,
   isSaved,
   onToggleSave,
+  isHidden,
+  onToggleHide,
   customLists,
   onToggleInList,
   onCreateList,
@@ -114,6 +132,18 @@ export function ListingDrawer({
           >
             <Heart className={`h-3.5 w-3.5 ${isSaved ? "fill-rose-400 text-rose-400" : ""}`} />
             {isSaved ? "Favorited" : "Favorite"}
+          </button>
+          <button
+            onClick={() => onToggleHide(item.id)}
+            className={`flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-medium transition ${
+              isHidden
+                ? "border-amber-500/50 bg-amber-500/15 text-amber-300"
+                : "border-zinc-800 text-zinc-300 hover:border-zinc-700"
+            }`}
+            title={isHidden ? "Unhide listing" : "Hide listing"}
+          >
+            {isHidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+            <span className="hidden sm:inline">{isHidden ? "Hidden" : "Hide"}</span>
           </button>
           <button
             onClick={() => {
