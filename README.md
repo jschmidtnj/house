@@ -71,6 +71,16 @@ dns-sd -P house _http._tcp local 8000 house.local "$(ipconfig getifaddr en0)"
 ```
 *(Or check your Mac's built-in `.local` name with `scutil --get LocalHostName` and use `http://<name>.local:8000` without running `dns-sd`).*
 
+### Expose Over the Internet (Cloudflare Tunnel)
+To get a temporary public HTTPS URL without port-forwarding or an account:
+```bash
+brew install cloudflared
+cloudflared tunnel --url http://127.0.0.1:8000
+```
+This prints an instant `https://<random>.trycloudflare.com` link that stays live while the command runs (`Ctrl+C` to stop).
+
+> **Note:** `house web` has no built-in authentication and exposes write endpoints (`/api/saved`, `/api/hidden`, `/api/lists`, `/api/poll`). Only share the tunnel URL with people you trust, or use **Tailscale** (`tailscale serve --bg 8000`) for private access across your own devices.
+
 ### Frontend Development Mode (Hot Reload)
 Run the FastAPI backend in one terminal and Vite in another:
 ```bash
