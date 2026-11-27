@@ -320,18 +320,49 @@ class Database:
             sess.commit()
             return existing.id, False, round(price_drop_pct, 2)
 
-    def mark_stale_off_market(self, source: str, seen_canonical_keys: set[str]) -> int:
-        """Mark previously active listings from `source` as `off_market` if missing from `seen_canonical_keys`."""
-        now = datetime.now(timezone.utc).isoformat()
+    def mark_stale_off_market(
+        self,
+        source: str,
+        seen_canonical_keys: set[str],
+        *,
+        allowed_zips: set[str] | None = None,
+        max_days_on_market: int | None = None,
+    ) -> int:
+        """Mark previously active listings from `source` as `off_market` if missing from `seen_canonical_keys`.
+
+        Guardrails to avoid false positives:
+        - When `allowed_zips` is provided, only listings whose `zip_code` is in `allowed_zips`
+          (i.e. zips that were polled cleanly without hitting the per-zip result cap) are eligible.
+        - When `max_days_on_market` is set (e.g. HomeHarvest `past_days`), listings that may have
+          aged past that window since `last_seen_at` (or whose `days_on_market` is unknown) are skipped.
+        """
+        if allowed_zips is not None and not allowed_zips:
+            return 0
+        now_dt = datetime.now(timezone.utc)
+        now = now_dt.isoformat()
         marked = 0
         with self.session() as sess:
             stmt = select(Listing).where(
                 Listing.primary_source == source,
                 Listing.status == "active",
             )
+            if allowed_zips is not None:
+                stmt = stmt.where(Listing.zip_code.in_(allowed_zips))
             for row in sess.scalars(stmt).all():
                 if row.canonical_key in seen_canonical_keys:
                     continue
+                if max_days_on_market is not None and max_days_on_market > 0:
+                    if row.days_on_market is None:
+                        continue
+                    elapsed_days = 0.0
+                    if row.last_seen_at:
+                        try:
+                            last_dt = datetime.fromisoformat(row.last_seen_at)
+                            elapsed_days = max(0.0, (now_dt - last_dt).total_seconds() / 86400.0)
+                        except ValueError:
+                            elapsed_days = 0.0
+                    if row.days_on_market + elapsed_days + 2.0 >= max_days_on_market:
+                        continue
                 row.status = "off_market"
                 sess.add(
                     PriceHistory(
@@ -356,6 +387,8 @@ class Database:
         *,
         reconcile_source: str | None = None,
         min_seen_to_reconcile: int = 20,
+        reconcile_zips: set[str] | None = None,
+        reconcile_max_dom: int | None = None,
     ) -> dict[str, int]:
         """Upsert a batch of listings and optionally mark missing rows for `reconcile_source` as `off_market`."""
         inserted = 0
@@ -378,7 +411,12 @@ class Database:
 
         marked_off_market = 0
         if reconcile_source and len(seen_for_reconcile) >= min_seen_to_reconcile:
-            marked_off_market = self.mark_stale_off_market(reconcile_source, seen_for_reconcile)
+            marked_off_market = self.mark_stale_off_market(
+                reconcile_source,
+                seen_for_reconcile,
+                allowed_zips=reconcile_zips,
+                max_days_on_market=reconcile_max_dom,
+            )
 
         return {
             "inserted": inserted,

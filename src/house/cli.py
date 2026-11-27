@@ -13,12 +13,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator
 
+from house.alerts import evaluate_alerts, seed_baseline_alerts
 from house.config import AppConfig, load_config
 from house.db import Database
 from house.finance import calculate_cost_breakdown
 from house.notify.discord import DiscordNotifier
 from house.scoring import rank_listings
-from house.sources import poll_all_sources
+from house.sources import poll_all_sources_with_scopes
 from house.sources.local_import import load_file
 
 
@@ -117,10 +118,16 @@ def _minutes_since(iso_ts: str | None) -> float | None:
 
 
 def cmd_poll(config: AppConfig, args: argparse.Namespace) -> int:
-    items, by_source = poll_all_sources(config, synthetic=args.synthetic)
+    items, by_source, scopes = poll_all_sources_with_scopes(config, synthetic=args.synthetic)
     reconcile = None if args.synthetic else "homeharvest"
+    hh_scope = scopes.get("homeharvest") if reconcile else None
     with Database(config.database_path) as db:
-        summary = db.upsert_listings(items, reconcile_source=reconcile)
+        summary = db.upsert_listings(
+            items,
+            reconcile_source=reconcile,
+            reconcile_zips=hh_scope.complete_zips if hh_scope else None,
+            reconcile_max_dom=hh_scope.max_days_on_market if hh_scope else None,
+        )
         db.set_bot_state("last_poll_at", datetime.now(timezone.utc).isoformat())
     print("Sources polled:", json.dumps(by_source, indent=2))
     print("Database upsert:", json.dumps(summary, indent=2))
@@ -230,9 +237,15 @@ def cmd_run(config: AppConfig, args: argparse.Namespace) -> int:
                 or mins_poll >= cfg.scheduler.poll_interval_minutes
             )
             if should_poll:
-                items, by_source = poll_all_sources(cfg, synthetic=args.synthetic)
+                items, by_source, scopes = poll_all_sources_with_scopes(cfg, synthetic=args.synthetic)
                 reconcile = None if args.synthetic else "homeharvest"
-                summary = db.upsert_listings(items, reconcile_source=reconcile)
+                hh_scope = scopes.get("homeharvest") if reconcile else None
+                summary = db.upsert_listings(
+                    items,
+                    reconcile_source=reconcile,
+                    reconcile_zips=hh_scope.complete_zips if hh_scope else None,
+                    reconcile_max_dom=hh_scope.max_days_on_market if hh_scope else None,
+                )
                 db.set_bot_state("last_poll_at", datetime.now(timezone.utc).isoformat())
                 print("Polled:", json.dumps(by_source), "| Upsert:", json.dumps(summary))
             else:
@@ -244,7 +257,13 @@ def cmd_run(config: AppConfig, args: argparse.Namespace) -> int:
 
             if not args.no_notify:
                 notifier = DiscordNotifier(cfg, db)
-                sent = notifier.notify_matches(scored)
+                if cfg.alerts.enabled:
+                    all_rows = db.get_listings(status=None)
+                    all_scored = rank_listings(all_rows, cfg.budget, cfg.search, include_rejected=True)
+                    candidates = evaluate_alerts(cfg, db, all_scored, update_watchlist_state=True)
+                    sent = notifier.notify_candidates(candidates)
+                else:
+                    sent = notifier.notify_matches(scored)
                 print(f"Discord alerts sent: {sent}")
 
             db.set_bot_state("last_run_at", datetime.now(timezone.utc).isoformat())
@@ -275,6 +294,58 @@ def cmd_test_discord(config: AppConfig, _args: argparse.Namespace) -> int:
         )
     print("Discord test sent!" if ok else "Discord webhook not configured (dry-run logged).")
     return 0
+
+
+def cmd_alerts(config: AppConfig, args: argparse.Namespace) -> int:
+    cfg = _apply_knob_overrides(config, args)
+    with Database(cfg.database_path) as db:
+        all_rows = db.get_listings(status=None)
+        if not all_rows:
+            print("No listings in database. Run `house poll` first.")
+            return 0
+        all_scored = rank_listings(all_rows, cfg.budget, cfg.search, include_rejected=True)
+
+        action = args.alerts_action
+        if action == "seed":
+            res = seed_baseline_alerts(cfg, db, all_scored)
+            print(
+                f"Seeded {res['seeded']} baseline alerts ({res['already_seen']} already recorded, "
+                f"{res['total_evaluated']} total current matches). Future `house run` cycles will "
+                f"only notify on NEW listings, price drops, and watchlist changes."
+            )
+            return 0
+
+        if action == "send":
+            candidates = evaluate_alerts(cfg, db, all_scored, update_watchlist_state=True)
+            notifier = DiscordNotifier(cfg, db)
+            sent = notifier.notify_candidates(candidates, max_alerts=args.limit)
+            print(f"Evaluated {len(candidates)} alert candidates; sent {sent} new Discord alert(s).")
+            return 0
+
+        # Default: preview (dry-run, no Discord messages, no DB mutation)
+        candidates = evaluate_alerts(cfg, db, all_scored, update_watchlist_state=False)
+        print(f"Alert Preview | {len(candidates)} candidate(s) matched across {len(cfg.alerts.profiles)} profiles")
+        print("-" * 124)
+        print(
+            f"{'ID':>4} {'TYPE':<20} {'TASTE':>6} {'MONTHLY':>9} {'FEES%':>6} "
+            f"{'BD/BA':<6} {'YR':>4} {'ZIP':<6} {'REASON'}"
+        )
+        print("-" * 124)
+        for cand in candidates[: args.top]:
+            l = cand.scored.listing
+            c = cand.scored.costs
+            eff_mo = c.net_monthly_cost if (cfg.budget.use_net_rental_for_filter and c.rentable_units > 0) else c.total_monthly_cost
+            t_str = f"{cand.taste_score:5.1f}%" if cand.taste_score is not None else "   N/A"
+            yr_str = str(l.year_built) if l.year_built else "   -"
+            bd_ba = f"{l.beds:g}/{l.baths:g}"
+            print(
+                f"{cand.listing_id:>4} {cand.alert_type:<20} {t_str:>6} ${eff_mo:>8,.0f} "
+                f"{c.monthly_fees_ratio * 100:>5.0f}% {bd_ba:<6} {yr_str:>4} "
+                f"{(l.zip_code or '')[:5]:<6} {cand.summary_reason} | {l.address}"
+            )
+        print("-" * 124)
+        print(f"Showing {min(len(candidates), args.top)} of {len(candidates)} total candidates (dry-run).")
+        return 0
 
 
 def cmd_web(_config: AppConfig, args: argparse.Namespace) -> int:
@@ -344,6 +415,17 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_disc = sub.add_parser("test-discord", help="Send a test embed to DISCORD_WEBHOOK_URL")
     p_disc.set_defaults(func=cmd_test_discord)
+
+    p_alerts = sub.add_parser("alerts", help="Preview, seed baseline, or send smart auto-alerts")
+    p_alerts.add_argument(
+        "alerts_action",
+        choices=["preview", "seed", "send"],
+        help="preview (dry-run), seed (mark existing as seen), or send (post new alerts to Discord)",
+    )
+    p_alerts.add_argument("--top", type=int, default=25, help="Max candidates to show in preview")
+    p_alerts.add_argument("--limit", type=int, default=None, help="Max Discord alerts to send")
+    _add_knob_args(p_alerts)
+    p_alerts.set_defaults(func=cmd_alerts)
 
     p_web = sub.add_parser("web", help="Launch the interactive NYC map & monthly-cost Web UI")
     p_web.add_argument("--host", default="127.0.0.1", help="Bind host (default: 127.0.0.1)")

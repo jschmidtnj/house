@@ -1,0 +1,91 @@
+# Smart Auto-Alert Configuration (Profiles, Watchlist, Favorite Buildings & Taste Match)
+# Run `house alerts preview` to test without sending Discord messages.
+# Run `house alerts seed` once before enabling cron so existing listings don't spam Discord.
+
+enabled: true
+respect_hidden: true          # Never alert on listings in hidden_listing_ids
+max_alerts_per_run: 10        # Anti-spam safety cap per run
+
+# Global alert guardrails (eliminates timeshare/fractional & high-fee traps)
+min_price: 450000
+max_fees_ratio: 0.40
+exclude_keywords:
+  - "exposed brick"
+  - "exposed-brick"
+
+# Optional base URL for Web UI deep links in Discord embeds (e.g. "http://127.0.0.1:8000")
+web_base_url: ""
+
+# Watchlist alerts for Favorites + custom lists (even if above default $7k/mo cap)
+watchlist:
+  enabled: true
+  include_saved: true
+  include_lists:
+    - "maybe"
+    - "jersey"
+  price_drop_pct: 2.0          # Alert when any watched listing drops >= 2%
+  budget_threshold_alert: true # Alert if a watched listing drops at or below budget.max_monthly_cost
+  status_change_alert: true    # Alert when a watched listing goes pending/off-market or relists
+
+# Alert when a new unit lists in a building you already favorited (e.g. 46-30 21st St, 1019 Hancock St)
+favorite_buildings:
+  enabled: true
+  max_monthly_cost: 8000
+
+# Lightweight Taste Match model learned live from your Favorites vs. Hidden listings in SQLite
+taste_match:
+  enabled: true
+  min_examples: 5              # Minimum favorites needed before gating on taste score
+  min_taste_score: 58.0        # Default 0-100 threshold (profiles can override)
+
+# Named saved-search alert profiles modeled from your Favorites & Jersey lists
+profiles:
+  - id: lic_modern_condo
+    name: "LIC Modern Condo"
+    zip_codes: ["11101", "11109"]
+    property_types: ["condo"]
+    min_beds: 1.0
+    max_monthly_cost: 7800
+    max_fees_ratio: 0.25
+    min_year_built: 2015
+    min_taste_score: 55.0
+
+  - id: north_bk_condo
+    name: "Northern BK Boutique Condo"
+    zip_codes: ["11221", "11237", "11206", "11211", "11222", "11216"]
+    property_types: ["condo"]
+    min_beds: 2.0
+    max_monthly_cost: 6800
+    max_fees_ratio: 0.25
+    max_monthly_hoa_maint: 900
+    min_taste_score: 60.0
+
+  - id: astoria_bk_multifamily
+    name: "Astoria / BK Multifamily"
+    zip_codes: ["11102", "11103", "11105", "11106", "11221", "11237", "11216"]
+    property_types: ["multifamily", "townhouse"]
+    min_units: 2
+    max_monthly_cost: 7800
+    max_fees_ratio: 0.15
+    min_taste_score: 50.0
+
+  - id: manhattan_value_2br
+    name: "Value Manhattan 2BR"
+    boroughs: ["Manhattan"]
+    property_types: ["condo", "coop", "condop"]
+    min_beds: 2.0
+    max_monthly_cost: 7000
+    max_fees_ratio: 0.35
+    max_commute_minutes: 30
+    min_taste_score: 60.0
+
+  - id: jc_waterfront_condo
+    name: "JC Waterfront Condo"
+    zip_codes: ["07302", "07310", "07311"]
+    property_types: ["condo", "coop"]
+    min_beds: 2.0
+    min_sqft: 800
+    max_monthly_cost: 7500
+    max_fees_ratio: 0.35
+    max_walk_to_station_min: 14
+    min_taste_score: 55.0

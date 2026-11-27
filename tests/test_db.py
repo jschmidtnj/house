@@ -113,3 +113,73 @@ def test_reconcile_marks_missing_listings_off_market_and_reactivates_on_relist()
         # If `b` comes back on the market later, it flips back to active
         db.upsert_listings([a, b], reconcile_source="homeharvest", min_seen_to_reconcile=1)
         assert len(db.get_listings(status="active")) == 3
+
+
+def test_reconcile_respects_allowed_zips_and_past_days_window():
+    with Database(":memory:") as db:
+        in_zip_fresh = ListingData(
+            source="homeharvest",
+            external_id="hh-fresh",
+            address="100 Bedford Ave",
+            unit="1A",
+            zip_code="11249",
+            price=1_100_000,
+            days_on_market=10,
+        )
+        in_zip_missing = ListingData(
+            source="homeharvest",
+            external_id="hh-gone",
+            address="102 Bedford Ave",
+            unit="2A",
+            zip_code="11249",
+            price=1_050_000,
+            days_on_market=12,
+        )
+        in_zip_aged_out = ListingData(
+            source="homeharvest",
+            external_id="hh-old",
+            address="104 Bedford Ave",
+            unit="3A",
+            zip_code="11249",
+            price=990_000,
+            days_on_market=44,
+        )
+        unpolled_zip = ListingData(
+            source="homeharvest",
+            external_id="hh-unpolled",
+            address="21-20 23 Dr",
+            unit="",
+            zip_code="11105",
+            price=1_799_000,
+            days_on_market=8,
+        )
+        db.upsert_listings([in_zip_fresh, in_zip_missing, in_zip_aged_out, unpolled_zip])
+
+        # Only zip 11249 completed cleanly, with past_days=45.
+        # Only `in_zip_missing` (dom=12) should be marked off_market:
+        # - `in_zip_aged_out` (dom=44) is protected by the past_days=45 window
+        # - `unpolled_zip` (zip 11105) is protected because 11105 wasn't in reconcile_zips
+        summary = db.upsert_listings(
+            [in_zip_fresh],
+            reconcile_source="homeharvest",
+            min_seen_to_reconcile=1,
+            reconcile_zips={"11249"},
+            reconcile_max_dom=45,
+        )
+        assert summary["marked_off_market"] == 1
+        statuses = {r.address: r.status for r in db.get_listings(status=None)}
+        assert statuses == {
+            "100 Bedford Ave": "active",
+            "102 Bedford Ave": "off_market",
+            "104 Bedford Ave": "active",
+            "21-20 23 Dr": "active",
+        }
+
+        # Empty reconcile_zips (e.g. every zip hit limit or failed) marks nothing off_market
+        summary_empty = db.upsert_listings(
+            [in_zip_fresh],
+            reconcile_source="homeharvest",
+            min_seen_to_reconcile=1,
+            reconcile_zips=set(),
+        )
+        assert summary_empty["marked_off_market"] == 0

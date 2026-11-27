@@ -20,7 +20,7 @@ from house.db import Database
 from house.finance import calculate_buy_vs_rent, calculate_cost_breakdown
 from house.models import ScoredListing
 from house.scoring import rank_listings
-from house.sources import poll_all_sources
+from house.sources import poll_all_sources_with_scopes
 
 
 class CreateListRequest(BaseModel):
@@ -392,10 +392,16 @@ def create_app(config_path: str | Path = "config/default.yaml") -> FastAPI:
     @app.post("/api/poll")
     def post_poll(synthetic: bool = False) -> dict[str, Any]:
         cfg = load_config(cfg_path)
-        items, by_source = poll_all_sources(cfg, synthetic=synthetic)
+        items, by_source, scopes = poll_all_sources_with_scopes(cfg, synthetic=synthetic)
         reconcile = None if synthetic else "homeharvest"
+        hh_scope = scopes.get("homeharvest") if reconcile else None
         with Database(cfg.database_path) as db:
-            summary = db.upsert_listings(items, reconcile_source=reconcile)
+            summary = db.upsert_listings(
+                items,
+                reconcile_source=reconcile,
+                reconcile_zips=hh_scope.complete_zips if hh_scope else None,
+                reconcile_max_dom=hh_scope.max_days_on_market if hh_scope else None,
+            )
             db.set_bot_state("last_poll_at", datetime.now(timezone.utc).isoformat())
         return {"sources": by_source, "upsert": summary}
 

@@ -89,8 +89,8 @@ class SearchConfig:
 class HomeHarvestSourceConfig:
     enabled: bool = True
     locations: list[str] = field(default_factory=lambda: ["Manhattan, NY", "Brooklyn, NY"])
-    past_days: int = 7
-    limit: int = 100
+    past_days: int | None = None
+    limit: int = 200
     extra_property_data: bool = True
     include_multifamily_pass: bool = True
 
@@ -136,6 +136,71 @@ class SourcesConfig:
 
 
 @dataclass
+class AlertProfileConfig:
+    id: str = ""
+    name: str = ""
+    enabled: bool = True
+    boroughs: list[str] = field(default_factory=list)
+    neighborhoods: list[str] = field(default_factory=list)
+    zip_codes: list[str] = field(default_factory=list)
+    property_types: list[str] = field(default_factory=list)
+    min_units: int = 1
+    max_units: int | None = None
+    min_beds: float = 0.0
+    min_baths: float = 0.0
+    min_sqft: int = 0
+    min_price: float | None = None
+    max_price: float | None = None
+    max_monthly_cost: float | None = None
+    max_fees_ratio: float | None = None
+    max_monthly_hoa_maint: float | None = None
+    min_year_built: int | None = None
+    max_year_built: int | None = None
+    max_commute_minutes: int | None = None
+    max_walk_to_station_min: int | None = None
+    min_taste_score: float | None = None
+    exclude_keywords: list[str] | None = None
+
+
+@dataclass
+class WatchlistAlertConfig:
+    enabled: bool = True
+    include_saved: bool = True
+    include_lists: list[str] = field(default_factory=lambda: ["maybe", "jersey"])
+    price_drop_pct: float = 2.0
+    budget_threshold_alert: bool = True
+    status_change_alert: bool = True
+
+
+@dataclass
+class FavoriteBuildingAlertConfig:
+    enabled: bool = True
+    max_monthly_cost: float = 8_000.0
+
+
+@dataclass
+class TasteMatchConfig:
+    enabled: bool = True
+    min_examples: int = 5
+    min_taste_score: float = 58.0
+
+
+@dataclass
+class AlertsConfig:
+    enabled: bool = False
+    respect_hidden: bool = True
+    max_alerts_per_run: int = 10
+    min_price: float = 450_000.0
+    max_fees_ratio: float = 0.40
+    exclude_keywords: list[str] = field(default_factory=list)
+    web_base_url: str = ""
+    watchlist: WatchlistAlertConfig = field(default_factory=WatchlistAlertConfig)
+    favorite_buildings: FavoriteBuildingAlertConfig = field(default_factory=FavoriteBuildingAlertConfig)
+    taste_match: TasteMatchConfig = field(default_factory=TasteMatchConfig)
+    profiles: list[AlertProfileConfig] = field(default_factory=list)
+
+
+@dataclass
 class EnvSecrets:
     discord_webhook_url: str = ""
     rapidapi_key: str = ""
@@ -155,6 +220,7 @@ class AppConfig:
     budget: BudgetConfig = field(default_factory=BudgetConfig)
     search: SearchConfig = field(default_factory=SearchConfig)
     sources: SourcesConfig = field(default_factory=SourcesConfig)
+    alerts: AlertsConfig = field(default_factory=AlertsConfig)
     secrets: EnvSecrets = field(default_factory=EnvSecrets)
 
 
@@ -226,6 +292,37 @@ def load_config(config_path: str | Path = "config/default.yaml") -> AppConfig:
         _apply_fields(cfg.sources.email_alerts, sources_raw.get("email_alerts"))
         _apply_fields(cfg.sources.rapidapi_streeteasy, sources_raw.get("rapidapi_streeteasy"))
         _apply_fields(cfg.sources.rentcast, sources_raw.get("rentcast"))
+
+    alerts_raw = raw.get("alerts", {})
+    if isinstance(alerts_raw, dict) and alerts_raw:
+        for scalar_key in (
+            "enabled",
+            "respect_hidden",
+            "max_alerts_per_run",
+            "min_price",
+            "max_fees_ratio",
+            "exclude_keywords",
+            "web_base_url",
+        ):
+            if scalar_key in alerts_raw and alerts_raw[scalar_key] is not None:
+                setattr(cfg.alerts, scalar_key, alerts_raw[scalar_key])
+        _apply_fields(cfg.alerts.watchlist, alerts_raw.get("watchlist"))
+        _apply_fields(cfg.alerts.favorite_buildings, alerts_raw.get("favorite_buildings"))
+        _apply_fields(cfg.alerts.taste_match, alerts_raw.get("taste_match"))
+        raw_profiles = alerts_raw.get("profiles")
+        if isinstance(raw_profiles, list):
+            parsed_profiles: list[AlertProfileConfig] = []
+            for idx, p in enumerate(raw_profiles):
+                if not isinstance(p, dict):
+                    continue
+                prof = AlertProfileConfig()
+                _apply_fields(prof, p)
+                if not prof.id:
+                    prof.id = f"profile_{idx + 1}"
+                if not prof.name:
+                    prof.name = prof.id
+                parsed_profiles.append(prof)
+            cfg.alerts.profiles = parsed_profiles
 
     cfg.secrets = EnvSecrets(
         discord_webhook_url=os.getenv("DISCORD_WEBHOOK_URL", "").strip(),

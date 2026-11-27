@@ -40,27 +40,30 @@ sources:
       - "11201"
       - "11205"
       - "11206"
+      - "11207"
       - "11211"
       - "11216"
       - "11217"
       - "11221"
       - "11222"
       - "11231"
+      - "11233"
       - "11237"
       - "11238"
       - "11249"
-      # Queens: Long Island City & Astoria
+      # Queens: Long Island City, Astoria & Ditmars
       - "11101"
       - "11102"
       - "11103"
+      - "11105"
       - "11106"
       # NJ (PATH-accessible): Hoboken, Downtown Jersey City, Newport, Journal Square
       - "07030"
       - "07302"
       - "07306"
       - "07310"
-    past_days: 45
-    limit: 60
+    past_days: null
+    limit: 200
     extra_property_data: true
     include_multifamily_pass: false
 

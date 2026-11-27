@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import requests
 
@@ -11,11 +11,16 @@ from house.config import AppConfig
 from house.db import Database
 from house.models import ScoredListing
 
+if TYPE_CHECKING:
+    from house.alerts import AlertCandidate
+
 logger = logging.getLogger(__name__)
 
-COLOR_NEW_MATCH = 0x2ECC71   # Green
-COLOR_PRICE_DROP = 0xF39C12  # Amber
-COLOR_INFO = 0x3498DB        # Blue
+COLOR_NEW_MATCH = 0x2ECC71     # Green
+COLOR_PRICE_DROP = 0xF39C12    # Amber
+COLOR_WATCHLIST = 0xE67E22     # Orange/Gold
+COLOR_FAV_BUILDING = 0x9B59B6  # Purple
+COLOR_INFO = 0x3498DB          # Blue
 
 
 class DiscordNotifier:
@@ -127,6 +132,123 @@ class DiscordNotifier:
                 description=description,
                 fields=fields,
                 color=COLOR_PRICE_DROP if is_price_drop else COLOR_NEW_MATCH,
+                url=l.url,
+            )
+            if ok:
+                self.db.mark_alert_notified(alert_id)
+                sent += 1
+        return sent
+
+    def notify_candidates(
+        self,
+        candidates: list[AlertCandidate],
+        *,
+        max_alerts: int | None = None,
+    ) -> int:
+        """
+        Send deduplicated, prioritized Discord alerts from the smart alert engine
+        (watchlist drops/status, favorite buildings, and named profile + Taste Match hits).
+        """
+        limit = max_alerts if max_alerts is not None else self.config.alerts.max_alerts_per_run
+        sent = 0
+        web_base = (self.config.alerts.web_base_url or "").rstrip("/")
+
+        for cand in candidates:
+            if limit > 0 and sent >= limit:
+                break
+
+            item = cand.scored
+            alert_id, is_new = self.db.record_alert(
+                listing_id=cand.listing_id,
+                alert_type=cand.alert_type,
+                dedupe_key=cand.dedupe_key,
+                score=cand.taste_score if cand.taste_score is not None else item.score,
+                total_monthly_cost=item.costs.total_monthly_cost,
+            )
+            if not is_new:
+                continue
+
+            l = item.listing
+            c = item.costs
+            unit_str = f" #{l.unit}" if l.unit else ""
+            hood = l.neighborhood or l.borough or "NYC"
+
+            if cand.alert_type == "WATCHLIST_PRICE_DROP":
+                prefix = f"📉 Watchlist Drop ({cand.watch_list_name})"
+                color = COLOR_WATCHLIST
+            elif cand.alert_type == "WATCHLIST_BUDGET":
+                prefix = f"✅ Watchlist In Budget ({cand.watch_list_name})"
+                color = COLOR_NEW_MATCH
+            elif cand.alert_type == "WATCHLIST_STATUS":
+                prefix = f"🔔 Watchlist Status ({cand.watch_list_name})"
+                color = COLOR_INFO
+            elif cand.alert_type == "FAVORITE_BUILDING":
+                prefix = "🏢 New Unit in Fav Building"
+                color = COLOR_FAV_BUILDING
+            elif cand.alert_type == "PRICE_DROP":
+                prefix = f"📉 Price Drop (-{item.price_drop_pct:.1f}%)"
+                color = COLOR_PRICE_DROP
+            else:
+                prof_tag = cand.matched_profiles[0] if cand.matched_profiles else "Match"
+                prefix = f"🎯 {prof_tag}"
+                color = COLOR_NEW_MATCH
+
+            title = f"{prefix}: {l.address}{unit_str} ({hood})"
+
+            sqft_str = f"{l.sqft:,} sqft" if l.sqft else "N/A sqft"
+            yr_str = f" | Built {l.year_built}" if l.year_built else ""
+            taste_str = f" | Taste Match: **{cand.taste_score:.0f}%**" if cand.taste_score is not None else ""
+            lines = [
+                f"**{l.property_type.upper()}** ({l.num_units}u) | {l.beds:g} bd / {l.baths:g} ba | {sqft_str}{yr_str}{taste_str}",
+                cand.summary_reason,
+            ]
+            if cand.taste_reasons:
+                lines.append("✨ " + " • ".join(cand.taste_reasons))
+            if web_base:
+                lines.append(f"[Open in House UI]({web_base}/?listing={cand.listing_id})")
+            description = "\n".join(ln for ln in lines if ln)
+
+            is_multi = c.rentable_units > 0 and self.config.budget.use_net_rental_for_filter
+            monthly_lbl = "Net Monthly" if is_multi else "All-In Monthly"
+            monthly_val = (
+                f"**${c.net_monthly_cost:,.0f}/mo** (gross ${c.total_monthly_cost:,.0f})"
+                if is_multi
+                else f"**${c.total_monthly_cost:,.0f}/mo**"
+            )
+            fee_label = "Maintenance" if l.property_type == "coop" else "HOA + Tax"
+            fee_val = (
+                f"${c.monthly_hoa_or_maint:,.0f}/mo ({c.monthly_fees_ratio * 100:.0f}%)"
+                if l.property_type == "coop"
+                else f"${c.monthly_hoa_or_maint + c.monthly_tax:,.0f}/mo ({c.monthly_fees_ratio * 100:.0f}%)"
+            )
+            commute_val = (
+                f"{item.commute_minutes}m ({', '.join(item.nearest_routes[:4])})"
+                if item.commute_minutes is not None
+                else "N/A"
+            )
+
+            fields = [
+                {"name": "Asking Price", "value": f"${l.price:,.0f}", "inline": True},
+                {"name": monthly_lbl, "value": monthly_val, "inline": True},
+                {"name": fee_label, "value": fee_val, "inline": True},
+                {"name": "Commute", "value": commute_val, "inline": True},
+                {
+                    "name": "Est. Cash to Close",
+                    "value": f"${c.estimated_cash_to_close:,.0f} ({c.down_payment_pct:.0f}% down)",
+                    "inline": True,
+                },
+                {
+                    "name": "Score",
+                    "value": f"{item.score:.1f}/100",
+                    "inline": True,
+                },
+            ]
+
+            ok = self.send_embed(
+                title=title,
+                description=description,
+                fields=fields,
+                color=color,
                 url=l.url,
             )
             if ok:

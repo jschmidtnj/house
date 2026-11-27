@@ -196,8 +196,10 @@ class HomeHarvestSource(ListingSource):
         self.source_cfg = source_cfg
         self.budget = budget
         self.search = search
+        self.complete_zips: set[str] = set()
 
     def fetch(self) -> list[ListingData]:
+        self.complete_zips = set()
         try:
             from homeharvest import scrape_property
         except ImportError:
@@ -213,16 +215,22 @@ class HomeHarvestSource(ListingSource):
             passes.append(["multi_family", "townhomes"])
 
         for location in self.source_cfg.locations:
+            loc_str = str(location).strip()
+            is_zip = len(loc_str) == 5 and loc_str.isdigit()
             for ptypes in passes:
+                limit_for_pass = self.source_cfg.limit if ptypes is None else min(100, self.source_cfg.limit)
                 try:
                     kwargs: dict[str, Any] = {
                         "location": location,
                         "listing_type": "for_sale",
-                        "past_days": self.source_cfg.past_days if ptypes is None else max(30, self.source_cfg.past_days),
-                        "limit": self.source_cfg.limit if ptypes is None else min(100, self.source_cfg.limit),
+                        "limit": limit_for_pass,
                         "extra_property_data": self.source_cfg.extra_property_data,
                         "price_max": int(self.budget.max_price),
                     }
+                    if self.source_cfg.past_days is not None and self.source_cfg.past_days > 0:
+                        kwargs["past_days"] = (
+                            self.source_cfg.past_days if ptypes is None else max(30, self.source_cfg.past_days)
+                        )
                     if ptypes is not None:
                         kwargs["property_type"] = ptypes
                     if self.budget.min_price > 0:
@@ -239,6 +247,8 @@ class HomeHarvestSource(ListingSource):
                     continue
 
                 records = df.to_dict(orient="records") if hasattr(df, "to_dict") else list(df)
+                if ptypes is None and is_zip and 0 < len(records) < limit_for_pass:
+                    self.complete_zips.add(loc_str)
                 for rec in records:
                     if isinstance(rec, dict):
                         parsed = parse_homeharvest_row(rec)
