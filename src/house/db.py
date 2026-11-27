@@ -368,6 +368,15 @@ class Database:
         except (TypeError, ValueError):
             lat_f, lng_f = None, None
         photo = str(raw.get("primary_photo") or raw.get("photo_url") or "")
+        raw_yb = raw.get("year_built")
+        year_built: int | None = None
+        if raw_yb is not None and str(raw_yb).strip() not in ("", "None", "nan"):
+            try:
+                yb_int = int(float(raw_yb))
+                if 1700 <= yb_int <= 2035:
+                    year_built = yb_int
+            except (TypeError, ValueError):
+                pass
         num_units = detect_num_units(
             row.property_type,
             row.description,
@@ -387,6 +396,7 @@ class Database:
             beds=row.beds,
             baths=row.baths,
             sqft=row.sqft,
+            year_built=year_built,
             monthly_hoa=row.monthly_hoa,
             monthly_maintenance=row.monthly_maintenance,
             monthly_tax=row.monthly_tax,

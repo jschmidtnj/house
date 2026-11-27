@@ -106,6 +106,7 @@ export function ListingsFeed({
                     {l.neighborhood || l.borough} •{" "}
                     <span className="uppercase">{l.property_type}</span> • {l.beds}bd/{l.baths}ba
                     {l.sqft ? ` • ${l.sqft.toLocaleString()} sqft` : ""}
+                    {l.year_built ? ` • ${l.year_built}` : ""}
                   </div>
                 </div>
                 <div className="shrink-0 text-right">

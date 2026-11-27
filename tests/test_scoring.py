@@ -218,3 +218,65 @@ def test_nj_max_walk_to_path_filters_far_jc():
     res_far = score_listing(2, "j2", far_greenville, budget, search)
     assert res_far.passes_filters is False
     assert any("Walk to PATH" in r for r in res_far.rejection_reasons)
+
+
+def test_year_built_filter():
+    budget = BudgetConfig(max_price=2_000_000, max_monthly_cost=9_000)
+    search_modern = SearchConfig(
+        boroughs=[],
+        neighborhoods=[],
+        property_types=["condo"],
+        min_year_built=2000,
+    )
+    prewar = ListingData(
+        source="test",
+        external_id="pw-1",
+        address="100 W 80th St",
+        property_type="condo",
+        price=950_000,
+        beds=1.0,
+        baths=1.0,
+        sqft=750,
+        year_built=1925,
+        monthly_hoa=750,
+        monthly_tax=650,
+    )
+    modern = ListingData(
+        source="test",
+        external_id="mod-1",
+        address="200 N 5th St",
+        property_type="condo",
+        price=950_000,
+        beds=1.0,
+        baths=1.0,
+        sqft=750,
+        year_built=2018,
+        monthly_hoa=750,
+        monthly_tax=650,
+    )
+    unknown = ListingData(
+        source="test",
+        external_id="unk-1",
+        address="300 E 10th St",
+        property_type="condo",
+        price=950_000,
+        beds=1.0,
+        baths=1.0,
+        sqft=750,
+        year_built=None,
+        monthly_hoa=750,
+        monthly_tax=650,
+    )
+
+    assert not score_listing(1, "pw", prewar, budget, search_modern).passes_filters
+    assert score_listing(2, "mod", modern, budget, search_modern).passes_filters
+    assert not score_listing(3, "unk", unknown, budget, search_modern).passes_filters
+
+    search_prewar = SearchConfig(
+        boroughs=[],
+        neighborhoods=[],
+        property_types=["condo"],
+        max_year_built=1945,
+    )
+    assert score_listing(1, "pw", prewar, budget, search_prewar).passes_filters
+    assert not score_listing(2, "mod", modern, budget, search_prewar).passes_filters

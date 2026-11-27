@@ -23,6 +23,7 @@ class ListingData:
     beds: float = 0.0
     baths: float = 0.0
     sqft: int | None = None
+    year_built: int | None = None
     monthly_hoa: float | None = None          # Condo common charges
     monthly_maintenance: float | None = None  # Co-op maintenance (includes taxes)
     monthly_tax: float | None = None          # Separate property tax (Condo/Townhouse)

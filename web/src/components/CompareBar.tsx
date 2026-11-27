@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ExternalLink, Maximize2, Scale, X } from "lucide-react";
 import type { ScoredListing } from "../types";
+import { buildStreetEasyUrl } from "../utils/streeteasy";
 
 interface CompareBarProps {
   items: ScoredListing[];
@@ -202,16 +203,29 @@ export function CompareBar({ items, onRemove, onClear, onSelect }: CompareBarPro
                                 <X className="h-3.5 w-3.5" />
                               </button>
                             </div>
-                            {l.url && (
-                              <a
-                                href={l.url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex items-center gap-1 text-[11px] text-blue-400 hover:text-blue-300"
-                              >
-                                View listing <ExternalLink className="h-3 w-3" />
-                              </a>
-                            )}
+                            <div className="flex flex-wrap items-center gap-3">
+                              {l.url && (
+                                <a
+                                  href={l.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1 text-[11px] text-blue-400 hover:text-blue-300"
+                                >
+                                  {l.url.includes("realtor.com") ? "Realtor.com" : "View listing"}{" "}
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                              )}
+                              {!l.url.includes("streeteasy.com") && (
+                                <a
+                                  href={buildStreetEasyUrl(l)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1 text-[11px] text-teal-300 hover:text-teal-200"
+                                >
+                                  StreetEasy <ExternalLink className="h-3 w-3" />
+                                </a>
+                              )}
+                            </div>
                           </div>
                         </th>
                       );

@@ -70,6 +70,8 @@ export function applyUrlKnobs(base: KnobsState, search: string): KnobsState {
     ["units", "min_units"],
     ["beds", "min_beds"],
     ["sqft", "min_sqft"],
+    ["min_yr", "min_year_built"],
+    ["max_yr", "max_year_built"],
     ["commute", "max_commute_minutes"],
     ["path", "nj_max_walk_to_path_min"],
   ];
@@ -139,6 +141,8 @@ export function buildUrlSearch(
     ["units", "min_units"],
     ["beds", "min_beds"],
     ["sqft", "min_sqft"],
+    ["min_yr", "min_year_built"],
+    ["max_yr", "max_year_built"],
     ["commute", "max_commute_minutes"],
     ["path", "nj_max_walk_to_path_min"],
   ];

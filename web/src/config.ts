@@ -26,6 +26,8 @@ export const DEFAULT_KNOBS: KnobsState = {
   min_units: 1,
   min_beds: 1,
   min_sqft: 600,
+  min_year_built: 0,
+  max_year_built: 0,
   max_commute_minutes: 0,
   nj_max_walk_to_path_min: 15,
   property_types: [...PROPERTY_TYPES],

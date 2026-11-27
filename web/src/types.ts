@@ -33,6 +33,8 @@ export interface SearchConfig {
   min_beds: number;
   min_baths: number;
   min_sqft: number;
+  min_year_built: number | null;
+  max_year_built: number | null;
   max_commute_minutes: number | null;
   nj_max_walk_to_path_min: number | null;
 }
@@ -91,6 +93,7 @@ export interface ListingItem {
   beds: number;
   baths: number;
   sqft: number | null;
+  year_built?: number | null;
   monthly_hoa: number | null;
   monthly_maintenance: number | null;
   monthly_tax: number | null;
@@ -176,6 +179,8 @@ export interface KnobsState {
   min_units: number;
   min_beds: number;
   min_sqft: number;
+  min_year_built: number; // 0 = any
+  max_year_built: number; // 0 = any
   max_commute_minutes: number; // 0 = no cap
   nj_max_walk_to_path_min: number; // 0 = no cap
   property_types: string[];

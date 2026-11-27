@@ -98,6 +98,15 @@ def score_listing(
     if search.min_sqft > 0 and listing.sqft is not None and listing.sqft < search.min_sqft:
         rejections.append(f"Sqft {listing.sqft} < min {search.min_sqft}")
 
+    if search.min_year_built is not None or search.max_year_built is not None:
+        if listing.year_built is None:
+            rejections.append("Year built unknown")
+        else:
+            if search.min_year_built is not None and listing.year_built < search.min_year_built:
+                rejections.append(f"Built {listing.year_built} < min {search.min_year_built}")
+            if search.max_year_built is not None and listing.year_built > search.max_year_built:
+                rejections.append(f"Built {listing.year_built} > max {search.max_year_built}")
+
     # 4. Required amenities & commute cap
     listing_amenities = {a.lower() for a in listing.amenities}
     for req in search.required_amenities:

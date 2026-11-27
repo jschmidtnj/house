@@ -475,6 +475,81 @@ export function KnobSidebar({
         </div>
       )}
 
+      {/* Year Built Filter */}
+      <div className="space-y-2 rounded-xl border border-zinc-800 bg-zinc-900/50 p-3">
+        <div className="flex items-center justify-between text-xs font-medium text-zinc-200">
+          <span className="flex items-center">
+            Year Built
+            <InfoTip
+              align="left"
+              text="Optional filter by building construction year (e.g., 2000+ for modern condos, or ≤1945 for NYC pre-war). Listings without a listed build year are hidden when a year filter is active."
+            />
+          </span>
+          {(knobs.min_year_built > 0 || knobs.max_year_built > 0) && (
+            <button
+              onClick={() => onChange({ ...knobs, min_year_built: 0, max_year_built: 0 })}
+              className="text-[10px] text-zinc-400 hover:text-zinc-200"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+
+        <div className="flex flex-wrap gap-1">
+          {[
+            { label: "Any", min: 0, max: 0 },
+            { label: "Pre-War (≤1945)", min: 0, max: 1945 },
+            { label: "1960+", min: 1960, max: 0 },
+            { label: "2000+", min: 2000, max: 0 },
+            { label: "2010+", min: 2010, max: 0 },
+            { label: "2015+", min: 2015, max: 0 },
+            { label: "2020+", min: 2020, max: 0 },
+          ].map((p) => {
+            const active = knobs.min_year_built === p.min && knobs.max_year_built === p.max;
+            return (
+              <button
+                key={p.label}
+                onClick={() => onChange({ ...knobs, min_year_built: p.min, max_year_built: p.max })}
+                className={`rounded-md border px-2 py-0.5 text-[11px] font-medium transition ${
+                  active
+                    ? "border-blue-500/60 bg-blue-500/15 text-blue-300"
+                    : "border-zinc-800 bg-zinc-900 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"
+                }`}
+              >
+                {p.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="grid grid-cols-2 gap-1.5">
+          <input
+            type="number"
+            min={1800}
+            max={2030}
+            placeholder="Min year"
+            value={knobs.min_year_built || ""}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              set("min_year_built", Number.isFinite(v) && v > 0 ? Math.round(v) : 0);
+            }}
+            className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-2 py-1 text-xs text-zinc-100 placeholder:text-zinc-500 focus:border-blue-500 focus:outline-none"
+          />
+          <input
+            type="number"
+            min={1800}
+            max={2030}
+            placeholder="Max year"
+            value={knobs.max_year_built || ""}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              set("max_year_built", Number.isFinite(v) && v > 0 ? Math.round(v) : 0);
+            }}
+            className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-2 py-1 text-xs text-zinc-100 placeholder:text-zinc-500 focus:border-blue-500 focus:outline-none"
+          />
+        </div>
+      </div>
+
       {/* Property Types */}
       <div className="space-y-1.5">
         <span className="text-xs text-zinc-400">Property Types</span>

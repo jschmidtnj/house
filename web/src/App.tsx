@@ -156,6 +156,8 @@ export function App() {
           min_units: cfg.search.min_units ?? 1,
           min_beds: cfg.search.min_beds,
           min_sqft: cfg.search.min_sqft,
+          min_year_built: cfg.search.min_year_built ?? 0,
+          max_year_built: cfg.search.max_year_built ?? 0,
           max_commute_minutes: cfg.search.max_commute_minutes ?? 0,
           nj_max_walk_to_path_min: cfg.search.nj_max_walk_to_path_min ?? 15,
           property_types: cfg.search.property_types,

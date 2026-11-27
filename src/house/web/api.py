@@ -49,6 +49,8 @@ class RankRequest(BaseModel):
     min_beds: float | None = None
     min_baths: float | None = None
     min_sqft: int | None = None
+    min_year_built: int | None = None
+    max_year_built: int | None = None
     min_units: int | None = None
     max_units: int | None = None
     max_commute_minutes: int | None = None
@@ -96,6 +98,7 @@ def _serialize_scored(item: ScoredListing, budget: Any = None) -> dict[str, Any]
             "beds": l.beds,
             "baths": l.baths,
             "sqft": l.sqft,
+            "year_built": l.year_built,
             "monthly_hoa": l.monthly_hoa,
             "monthly_maintenance": l.monthly_maintenance,
             "monthly_tax": l.monthly_tax,
@@ -153,6 +156,10 @@ def _apply_rank_request(base_cfg: AppConfig, req: RankRequest) -> AppConfig:
         cfg.search.min_baths = req.min_baths
     if req.min_sqft is not None:
         cfg.search.min_sqft = req.min_sqft
+    if req.min_year_built is not None:
+        cfg.search.min_year_built = req.min_year_built if req.min_year_built > 0 else None
+    if req.max_year_built is not None:
+        cfg.search.max_year_built = req.max_year_built if req.max_year_built > 0 else None
     if req.min_units is not None:
         cfg.search.min_units = req.min_units
     if req.max_units is not None:

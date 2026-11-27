@@ -7,7 +7,6 @@ import {
   EyeOff,
   FolderPlus,
   Heart,
-  Link2,
   MapPin,
   Maximize2,
   Minimize2,
@@ -27,6 +26,7 @@ import {
 } from "recharts";
 import { UI_CONFIG } from "../config";
 import type { ScoredListing } from "../types";
+import { buildStreetEasyUrl } from "../utils/streeteasy";
 import { HoverTip, InfoTip } from "./InfoTip";
 
 interface ListingDrawerProps {
@@ -60,7 +60,6 @@ export function ListingDrawer({
 }: ListingDrawerProps) {
   const [width, setWidth] = useState<number>(UI_CONFIG.drawer.defaultWidth);
   const [dragging, setDragging] = useState<boolean>(false);
-  const [copied, setCopied] = useState<boolean>(false);
   const [newListName, setNewListName] = useState<string>("");
 
   useEffect(() => {
@@ -121,6 +120,7 @@ export function ListingDrawer({
               <span className="uppercase">{l.property_type}</span> •{" "}
               <span className="font-medium text-zinc-200">
                 {l.beds} bd / {l.baths} ba{l.sqft ? ` • ${l.sqft.toLocaleString()} sqft` : ""}
+                {l.year_built ? ` • Built ${l.year_built}` : ""}
               </span>
             </p>
           </div>
@@ -193,20 +193,6 @@ export function ListingDrawer({
           >
             <Scale className="h-3.5 w-3.5" />
             <span>{isPinned ? "Pinned" : "Compare"}</span>
-          </button>
-          <button
-            onClick={() => {
-              const url = new URL(window.location.href);
-              url.searchParams.set("listing", String(item.id));
-              navigator.clipboard?.writeText(url.toString()).catch(() => {});
-              setCopied(true);
-              setTimeout(() => setCopied(false), 1500);
-            }}
-            className="flex items-center gap-1 rounded-lg border border-zinc-800 px-2.5 py-1 text-xs font-medium text-zinc-300 transition hover:border-zinc-700 hover:text-zinc-100"
-            title="Copy direct link"
-          >
-            {copied ? <Check className="h-3.5 w-3.5 text-teal-400" /> : <Link2 className="h-3.5 w-3.5" />}
-            <span>{copied ? "Copied" : "Link"}</span>
           </button>
         </div>
       </div>
@@ -608,18 +594,33 @@ export function ListingDrawer({
         )}
       </div>
 
-      {l.url && (
-        <div className="border-t border-zinc-800 p-3">
+      <div className="flex items-center gap-2 border-t border-zinc-800 p-3">
+        {l.url && (
           <a
             href={l.url}
             target="_blank"
             rel="noreferrer"
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-zinc-100 px-4 py-2 text-xs font-semibold text-zinc-950 transition hover:opacity-90"
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-zinc-100 px-3 py-2 text-xs font-semibold text-zinc-950 transition hover:opacity-90"
           >
-            Open Full Listing <ExternalLink className="h-3.5 w-3.5" />
+            {l.url.includes("realtor.com")
+              ? "Realtor.com"
+              : l.url.includes("streeteasy.com")
+              ? "StreetEasy"
+              : "Open Listing"}{" "}
+            <ExternalLink className="h-3.5 w-3.5" />
           </a>
-        </div>
-      )}
+        )}
+        {!l.url.includes("streeteasy.com") && (
+          <a
+            href={buildStreetEasyUrl(l)}
+            target="_blank"
+            rel="noreferrer"
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs font-semibold text-zinc-100 transition hover:border-blue-500/60 hover:text-blue-300"
+          >
+            StreetEasy <ExternalLink className="h-3.5 w-3.5" />
+          </a>
+        )}
+      </div>
     </div>
   );
 }

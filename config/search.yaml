@@ -152,6 +152,8 @@ exclude_land_lease: false
 min_beds: 1.0
 min_baths: 1.0
 min_sqft: 600
+min_year_built: null              # Optional minimum building year built (e.g. 2000)
+max_year_built: null              # Optional maximum building year built (e.g. 1945 for pre-war)
 max_commute_minutes: null         # Optional cap in minutes to Midtown Manhattan (e.g. 30)
 nj_max_walk_to_path_min: 15       # Max walking minutes to nearest PATH station for Jersey City & Hoboken
 

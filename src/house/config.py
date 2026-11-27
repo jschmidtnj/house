@@ -64,6 +64,8 @@ class SearchConfig:
     min_beds: float = 1.0
     min_baths: float = 1.0
     min_sqft: int = 0
+    min_year_built: int | None = None
+    max_year_built: int | None = None
     max_commute_minutes: int | None = None
     nj_max_walk_to_path_min: int | None = 15
     preferred_amenities: list[str] = field(default_factory=list)
