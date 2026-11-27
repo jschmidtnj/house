@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Eye, EyeOff, Heart, Scale } from "lucide-react";
+import { Bookmark, Eye, EyeOff, Heart, Scale } from "lucide-react";
 import type { ScoredListing } from "../types";
 import { HoverTip } from "./InfoTip";
 import { SearchAutocomplete } from "./SearchAutocomplete";
@@ -13,6 +13,7 @@ interface ListingsFeedProps {
   selectedId: number | null;
   savedIds: number[];
   hiddenIds: number[];
+  customLists?: Record<string, number[]>;
   pinnedIds: number[];
   useNetRental: boolean;
   searchQuery: string;
@@ -33,6 +34,7 @@ export function ListingsFeed({
   selectedId,
   savedIds,
   hiddenIds,
+  customLists = {},
   pinnedIds,
   useNetRental,
   searchQuery,
@@ -80,6 +82,9 @@ export function ListingsFeed({
           const pinned = pinnedIds.includes(item.id);
           const saved = savedIds.includes(item.id);
           const hidden = hiddenIds.includes(item.id);
+          const memberLists = Object.entries(customLists)
+            .filter(([, ids]) => ids.includes(item.id))
+            .map(([name]) => name);
           const shownMo =
             c.rentable_units > 0 && useNetRental ? c.net_monthly_cost : c.total_monthly_cost;
 
@@ -99,8 +104,18 @@ export function ListingsFeed({
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="truncate text-xs font-semibold text-zinc-100">
-                    {l.address} {l.unit ? `#${l.unit}` : ""}
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate text-xs font-semibold text-zinc-100">
+                      {l.address} {l.unit ? `#${l.unit}` : ""}
+                    </span>
+                    {memberLists.length > 0 && (
+                      <HoverTip text={`In lists: ${memberLists.join(", ")}`}>
+                        <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-medium text-blue-300">
+                          <Bookmark className="h-2.5 w-2.5 fill-blue-400 text-blue-400" />
+                          {memberLists.length === 1 ? memberLists[0] : `${memberLists.length} lists`}
+                        </span>
+                      </HoverTip>
+                    )}
                   </div>
                   <div className="text-[11px] text-zinc-400">
                     {l.neighborhood || l.borough} •{" "}
@@ -182,6 +197,21 @@ export function ListingsFeed({
                       Fees ${Math.round(c.monthly_hoa_or_maint + c.monthly_tax).toLocaleString()}
                     </span>
                   </HoverTip>
+                  {l.days_on_market != null && l.days_on_market >= 0 && (
+                    <HoverTip
+                      text={`${l.days_on_market} day${l.days_on_market === 1 ? "" : "s"} on market. Listings sitting 60+ days often have more room to negotiate.`}
+                    >
+                      <span
+                        className={`rounded px-1.5 py-0.5 ${
+                          l.days_on_market >= 60
+                            ? "bg-amber-500/12 text-amber-300"
+                            : "bg-zinc-800/80 text-zinc-400"
+                        }`}
+                      >
+                        {l.days_on_market}d
+                      </span>
+                    </HoverTip>
+                  )}
                 </div>
                 <div className="flex items-center gap-1">
                   <HoverTip text={saved ? "Remove from favorites" : "Favorite listing"}>

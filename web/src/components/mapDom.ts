@@ -15,7 +15,11 @@ export function pinColors(item: ScoredListing, isSelected: boolean): { bg: strin
   return SCORE_TIERS.colors.match;
 }
 
-export function createListingPinElement(item: ScoredListing, isSelected: boolean): HTMLElement {
+export function createListingPinElement(
+  item: ScoredListing,
+  isSelected: boolean,
+  markerTag: "" | "♥" | "★" = ""
+): HTMLElement {
   const pin = pinColors(item, isSelected);
   const shownMonthly =
     item.costs.rentable_units > 0 ? item.costs.net_monthly_cost : item.costs.total_monthly_cost;
@@ -24,11 +28,16 @@ export function createListingPinElement(item: ScoredListing, isSelected: boolean
   el.className = isSelected ? "map-price-pin map-price-pin-selected" : "map-price-pin";
   el.style.backgroundColor = pin.bg;
   el.style.color = pin.fg;
-  el.textContent = `${item.costs.rentable_units > 0 ? `${item.costs.num_units}U ` : ""}${formatShortMonthly(shownMonthly)}`;
+  const tagPrefix = markerTag ? `${markerTag} ` : "";
+  const unitPrefix = item.costs.rentable_units > 0 ? `${item.costs.num_units}U ` : "";
+  el.textContent = `${tagPrefix}${unitPrefix}${formatShortMonthly(shownMonthly)}`;
   return el;
 }
 
-export function createListingTooltipElement(item: ScoredListing): HTMLElement {
+export function createListingTooltipElement(
+  item: ScoredListing,
+  listNames: string[] = []
+): HTMLElement {
   const shownMonthly =
     item.costs.rentable_units > 0 ? item.costs.net_monthly_cost : item.costs.total_monthly_cost;
   const unitStr = item.listing.unit ? ` #${item.listing.unit}` : "";
@@ -57,6 +66,13 @@ export function createListingTooltipElement(item: ScoredListing): HTMLElement {
   meta.textContent = parts.join(" • ");
 
   root.append(title, meta);
+
+  if (listNames.length > 0) {
+    const listsEl = document.createElement("div");
+    listsEl.className = "map-tooltip-hint";
+    listsEl.textContent = `★ In: ${listNames.join(", ")}`;
+    root.appendChild(listsEl);
+  }
   return root;
 }
 
@@ -95,7 +111,8 @@ export function createClusterPinElement(
 export function createBuildingUnitsPopupElement(
   items: ScoredListing[],
   selectedId: number | null,
-  onSelect: (item: ScoredListing) => void
+  onSelect: (item: ScoredListing) => void,
+  listsById: Map<number, string[]> = new Map()
 ): HTMLElement {
   const root = document.createElement("div");
   root.className = "map-building-popup";
@@ -119,6 +136,7 @@ export function createBuildingUnitsPopupElement(
   for (const item of items) {
     const shownMonthly =
       item.costs.rentable_units > 0 ? item.costs.net_monthly_cost : item.costs.total_monthly_cost;
+    const itemLists = listsById.get(item.id) || [];
 
     const btn = document.createElement("button");
     btn.type = "button";
@@ -136,7 +154,8 @@ export function createBuildingUnitsPopupElement(
 
     const unitLabel = document.createElement("div");
     unitLabel.className = "map-building-unit-name";
-    unitLabel.textContent = item.listing.unit ? `#${item.listing.unit}` : "Unit";
+    const listTag = itemLists.length > 0 ? (itemLists.includes("Favorites") ? "♥ " : "★ ") : "";
+    unitLabel.textContent = `${listTag}${item.listing.unit ? `#${item.listing.unit}` : "Unit"}`;
 
     const meta = document.createElement("div");
     meta.className = "map-building-unit-meta";

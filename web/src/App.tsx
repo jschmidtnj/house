@@ -374,6 +374,7 @@ export function App() {
       selectedId={selectedId ?? focusedId}
       savedIds={savedIds}
       hiddenIds={hiddenIds}
+      customLists={customLists}
       pinnedIds={pinnedIds}
       useNetRental={knobs.use_net_rental_for_filter}
       searchQuery={knobs.search_query}
@@ -467,6 +468,8 @@ export function App() {
                     onSelect={(item) => selectListing(item.id)}
                     theme={theme}
                     targetNeighborhoods={targetNeighborhoods}
+                    savedIds={savedIds}
+                    customLists={customLists}
                   />
                 </div>
                 {showRightPanel && (
@@ -494,6 +497,8 @@ export function App() {
                       onSelect={(item) => selectListing(item.id)}
                       theme={theme}
                       targetNeighborhoods={targetNeighborhoods}
+                      savedIds={savedIds}
+                      customLists={customLists}
                     />
                   </div>
                 ) : (

@@ -121,6 +121,9 @@ export function ListingDrawer({
               <span className="font-medium text-zinc-200">
                 {l.beds} bd / {l.baths} ba{l.sqft ? ` • ${l.sqft.toLocaleString()} sqft` : ""}
                 {l.year_built ? ` • Built ${l.year_built}` : ""}
+                {l.days_on_market != null && l.days_on_market >= 0
+                  ? ` • ${l.days_on_market}d on market`
+                  : ""}
               </span>
             </p>
           </div>

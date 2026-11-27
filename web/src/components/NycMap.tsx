@@ -18,6 +18,8 @@ interface NycMapProps {
   onSelect: (item: ScoredListing) => void;
   theme?: "dark" | "light";
   targetNeighborhoods?: string[];
+  savedIds?: number[];
+  customLists?: Record<string, number[]>;
 }
 
 interface SubwayStation {
@@ -40,6 +42,8 @@ export function NycMap({
   onSelect,
   theme = "dark",
   targetNeighborhoods = [],
+  savedIds = [],
+  customLists = {},
 }: NycMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -63,6 +67,21 @@ export function NycMap({
     () => targetNeighborhoods.map((n) => n.trim().toLowerCase()).filter(Boolean),
     [targetNeighborhoods]
   );
+
+  const listsById = useMemo(() => {
+    const map = new Map<number, string[]>();
+    for (const id of savedIds) {
+      map.set(id, ["Favorites"]);
+    }
+    for (const [name, ids] of Object.entries(customLists)) {
+      for (const id of ids) {
+        const arr = map.get(id) || [];
+        arr.push(name);
+        map.set(id, arr);
+      }
+    }
+    return map;
+  }, [savedIds, customLists]);
 
   const isTargetHood = (name: string): boolean => {
     const lower = name.toLowerCase();
@@ -264,11 +283,16 @@ export function NycMap({
       const isSelected = item.id === selectedId;
       const zIndex = isSelected ? 1000 : item.passes_filters ? Math.round(item.score * 5) : 10;
       const isMulti = item.costs.rentable_units > 0;
-      const pinWidth = isMulti ? MAP_CONFIG.pinSizes.multiUnitWidth : MAP_CONFIG.pinSizes.singleWidth;
+      const itemLists = listsById.get(item.id) || [];
+      const markerTag: "" | "♥" | "★" =
+        itemLists.length === 0 ? "" : itemLists.includes("Favorites") ? "♥" : "★";
+      const pinWidth =
+        (isMulti ? MAP_CONFIG.pinSizes.multiUnitWidth : MAP_CONFIG.pinSizes.singleWidth) +
+        (markerTag ? 14 : 0);
       const pinHeight = MAP_CONFIG.pinSizes.height;
       const icon = L.divIcon({
         className: "house-pin",
-        html: createListingPinElement(item, isSelected),
+        html: createListingPinElement(item, isSelected, markerTag),
         iconSize: [pinWidth, pinHeight],
         iconAnchor: [pinWidth / 2, pinHeight / 2],
       });
@@ -276,7 +300,7 @@ export function NycMap({
         icon,
         zIndexOffset: zIndex,
       });
-      marker.bindTooltip(() => createListingTooltipElement(item), {
+      marker.bindTooltip(() => createListingTooltipElement(item, itemLists), {
         direction: "top",
         offset: [0, -10],
       });
@@ -317,10 +341,15 @@ export function NycMap({
 
       marker.bindPopup(
         () =>
-          createBuildingUnitsPopupElement(sorted, selectedId, (chosen) => {
-            marker.closePopup();
-            onSelect(chosen);
-          }),
+          createBuildingUnitsPopupElement(
+            sorted,
+            selectedId,
+            (chosen) => {
+              marker.closePopup();
+              onSelect(chosen);
+            },
+            listsById
+          ),
         {
           closeButton: true,
           offset: [0, -8],
@@ -421,7 +450,7 @@ export function NycMap({
       });
       marker.addTo(layer);
     }
-  }, [listings, selectedId, onSelect, zoom]);
+  }, [listings, selectedId, onSelect, zoom, listsById]);
 
   const lastFlownIdRef = useRef<number | null>(null);
 

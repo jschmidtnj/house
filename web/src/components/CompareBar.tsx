@@ -390,6 +390,17 @@ export function CompareBar({ items, onRemove, onClear, onSelect }: CompareBarPro
                   </tr>
 
                   <tr>
+                    <td className="py-2.5 pr-3 text-zinc-400">Days on Market</td>
+                    {items.map((item) => (
+                      <td key={item.id} className="px-3 py-2.5 text-zinc-300">
+                        {item.listing.days_on_market != null && item.listing.days_on_market >= 0
+                          ? `${item.listing.days_on_market} days`
+                          : "—"}
+                      </td>
+                    ))}
+                  </tr>
+
+                  <tr>
                     <td className="py-2.5 pr-3 text-zinc-400">Amenities</td>
                     {items.map((item) => (
                       <td key={item.id} className="px-3 py-2.5">
