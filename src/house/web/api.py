@@ -393,8 +393,9 @@ def create_app(config_path: str | Path = "config/default.yaml") -> FastAPI:
     def post_poll(synthetic: bool = False) -> dict[str, Any]:
         cfg = load_config(cfg_path)
         items, by_source = poll_all_sources(cfg, synthetic=synthetic)
+        reconcile = None if synthetic else "homeharvest"
         with Database(cfg.database_path) as db:
-            summary = db.upsert_listings(items)
+            summary = db.upsert_listings(items, reconcile_source=reconcile)
             db.set_bot_state("last_poll_at", datetime.now(timezone.utc).isoformat())
         return {"sources": by_source, "upsert": summary}
 

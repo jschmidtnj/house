@@ -320,22 +320,72 @@ class Database:
             sess.commit()
             return existing.id, False, round(price_drop_pct, 2)
 
-    def upsert_listings(self, items: list[ListingData]) -> dict[str, int]:
-        """Upsert a batch of listings and return summary counts."""
+    def mark_stale_off_market(self, source: str, seen_canonical_keys: set[str]) -> int:
+        """Mark previously active listings from `source` as `off_market` if missing from `seen_canonical_keys`."""
+        now = datetime.now(timezone.utc).isoformat()
+        marked = 0
+        with self.session() as sess:
+            stmt = select(Listing).where(
+                Listing.primary_source == source,
+                Listing.status == "active",
+            )
+            for row in sess.scalars(stmt).all():
+                if row.canonical_key in seen_canonical_keys:
+                    continue
+                row.status = "off_market"
+                sess.add(
+                    PriceHistory(
+                        listing_id=row.id,
+                        recorded_at=now,
+                        price=row.price,
+                        monthly_hoa=row.monthly_hoa,
+                        monthly_maintenance=row.monthly_maintenance,
+                        monthly_tax=row.monthly_tax,
+                        status="off_market",
+                        source=source,
+                    )
+                )
+                marked += 1
+            if marked:
+                sess.commit()
+        return marked
+
+    def upsert_listings(
+        self,
+        items: list[ListingData],
+        *,
+        reconcile_source: str | None = None,
+        min_seen_to_reconcile: int = 20,
+    ) -> dict[str, int]:
+        """Upsert a batch of listings and optionally mark missing rows for `reconcile_source` as `off_market`."""
         inserted = 0
         updated = 0
         price_drops = 0
+        seen_for_reconcile: set[str] = set()
         for item in items:
             if item.price <= 0:
                 continue
             _, is_new, drop_pct = self.upsert_listing(item)
+            if reconcile_source and item.source == reconcile_source:
+                ckey = make_canonical_key(item.address, item.unit, item.zip_code)
+                seen_for_reconcile.add(ckey or f"{item.source}:{item.external_id}")
             if is_new:
                 inserted += 1
             else:
                 updated += 1
             if drop_pct > 0:
                 price_drops += 1
-        return {"inserted": inserted, "updated": updated, "price_drops": price_drops}
+
+        marked_off_market = 0
+        if reconcile_source and len(seen_for_reconcile) >= min_seen_to_reconcile:
+            marked_off_market = self.mark_stale_off_market(reconcile_source, seen_for_reconcile)
+
+        return {
+            "inserted": inserted,
+            "updated": updated,
+            "price_drops": price_drops,
+            "marked_off_market": marked_off_market,
+        }
 
     def get_listings(self, status: str | None = "active") -> list[Listing]:
         stmt = select(Listing).order_by(Listing.price.asc())

@@ -64,11 +64,16 @@ export function createClusterPinElement(
   count: number,
   minMonthly: number,
   accentColor: string,
-  compact: boolean
+  compact: boolean,
+  isSelected = false
 ): HTMLElement {
   const el = document.createElement("div");
-  el.className = compact ? "map-cluster-bubble" : "map-cluster-pill";
-  el.style.borderColor = accentColor;
+  el.className = compact
+    ? "map-cluster-bubble"
+    : isSelected
+    ? "map-cluster-pill map-price-pin-selected"
+    : "map-cluster-pill";
+  el.style.borderColor = isSelected ? "#3b82f6" : accentColor;
 
   if (compact) {
     el.textContent = String(count);
@@ -85,6 +90,72 @@ export function createClusterPinElement(
 
   el.append(badge, price);
   return el;
+}
+
+export function createBuildingUnitsPopupElement(
+  items: ScoredListing[],
+  selectedId: number | null,
+  onSelect: (item: ScoredListing) => void
+): HTMLElement {
+  const root = document.createElement("div");
+  root.className = "map-building-popup";
+
+  const header = document.createElement("div");
+  header.className = "map-building-popup-header";
+
+  const title = document.createElement("div");
+  title.className = "map-tooltip-title";
+  title.textContent = items[0]?.listing.address || "Building";
+
+  const count = document.createElement("div");
+  count.className = "map-building-popup-sub";
+  count.textContent = `${items.length} units in building`;
+
+  header.append(title, count);
+
+  const list = document.createElement("div");
+  list.className = "map-building-unit-list";
+
+  for (const item of items) {
+    const shownMonthly =
+      item.costs.rentable_units > 0 ? item.costs.net_monthly_cost : item.costs.total_monthly_cost;
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className =
+      item.id === selectedId
+        ? "map-building-unit-row map-building-unit-row-selected"
+        : "map-building-unit-row";
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      onSelect(item);
+    });
+
+    const left = document.createElement("div");
+    left.className = "map-building-unit-left";
+
+    const unitLabel = document.createElement("div");
+    unitLabel.className = "map-building-unit-name";
+    unitLabel.textContent = item.listing.unit ? `#${item.listing.unit}` : "Unit";
+
+    const meta = document.createElement("div");
+    meta.className = "map-building-unit-meta";
+    meta.textContent = `${item.listing.beds}bd/${item.listing.baths}ba${
+      item.listing.sqft ? ` • ${item.listing.sqft.toLocaleString()}sf` : ""
+    } • Score ${item.score.toFixed(1)}`;
+
+    left.append(unitLabel, meta);
+
+    const price = document.createElement("div");
+    price.className = "map-building-unit-price";
+    price.textContent = `$${Math.round(shownMonthly).toLocaleString()}/mo`;
+
+    btn.append(left, price);
+    list.appendChild(btn);
+  }
+
+  root.append(header, list);
+  return root;
 }
 
 export function createClusterTooltipElement(

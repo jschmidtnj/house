@@ -73,3 +73,43 @@ def test_alert_deduplication():
         assert new1 is True
         assert new2 is False
         assert aid1 == aid2
+
+
+def test_reconcile_marks_missing_listings_off_market_and_reactivates_on_relist():
+    with Database(":memory:") as db:
+        a = ListingData(
+            source="homeharvest",
+            external_id="hh-1",
+            address="100 Bedford Ave",
+            unit="4A",
+            zip_code="11249",
+            price=1_100_000,
+        )
+        b = ListingData(
+            source="homeharvest",
+            external_id="hh-2",
+            address="200 Bedford Ave",
+            unit="5B",
+            zip_code="11249",
+            price=1_200_000,
+        )
+        local = ListingData(
+            source="local_import",
+            external_id="loc-1",
+            address="300 Bedford Ave",
+            unit="2C",
+            zip_code="11249",
+            price=950_000,
+        )
+        db.upsert_listings([a, b, local])
+        assert len(db.get_listings(status="active")) == 3
+
+        # Next homeharvest poll only sees `a` -> `b` becomes off_market, `local` stays active
+        summary = db.upsert_listings([a], reconcile_source="homeharvest", min_seen_to_reconcile=1)
+        assert summary["marked_off_market"] == 1
+        active_addrs = {r.address for r in db.get_listings(status="active")}
+        assert active_addrs == {"100 Bedford Ave", "300 Bedford Ave"}
+
+        # If `b` comes back on the market later, it flips back to active
+        db.upsert_listings([a, b], reconcile_source="homeharvest", min_seen_to_reconcile=1)
+        assert len(db.get_listings(status="active")) == 3

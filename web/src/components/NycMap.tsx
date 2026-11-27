@@ -4,6 +4,7 @@ import { Layers, Map as MapIcon, TrainFront } from "lucide-react";
 import { MAP_CONFIG, MTA_COLORS, SCORE_TIERS, type BasemapStyle } from "../config";
 import type { ScoredListing } from "../types";
 import {
+  createBuildingUnitsPopupElement,
   createClusterPinElement,
   createClusterTooltipElement,
   createListingPinElement,
@@ -283,8 +284,75 @@ export function NycMap({
       marker.addTo(layer);
     };
 
+    const canHover = window.matchMedia("(hover: hover)").matches;
+
+    const addBuildingMarker = (group: ScoredListing[]) => {
+      const sorted = [...group].sort((a, b) => b.score - a.score);
+      const hasSelected = sorted.some((i) => i.id === selectedId);
+      const minMonthly = Math.min(
+        ...sorted.map((i) =>
+          i.costs.rentable_units > 0 ? i.costs.net_monthly_cost : i.costs.total_monthly_cost
+        )
+      );
+      const topScore = Math.max(...sorted.map((i) => i.score));
+      const accent =
+        topScore >= SCORE_TIERS.topMin
+          ? SCORE_TIERS.colors.top.bg
+          : topScore >= SCORE_TIERS.goodMin
+          ? SCORE_TIERS.colors.good.bg
+          : SCORE_TIERS.colors.match.bg;
+
+      const { pillClusterWidth: pW, pillClusterHeight: pH } = MAP_CONFIG.pinSizes;
+      const icon = L.divIcon({
+        className: "house-pin",
+        html: createClusterPinElement(sorted.length, minMonthly, accent, false, hasSelected),
+        iconSize: [pW, pH],
+        iconAnchor: [pW / 2, pH / 2],
+      });
+
+      const marker = L.marker([sorted[0].listing.latitude!, sorted[0].listing.longitude!], {
+        icon,
+        zIndexOffset: hasSelected ? 1000 : 350 + sorted.length,
+      });
+
+      marker.bindPopup(
+        () =>
+          createBuildingUnitsPopupElement(sorted, selectedId, (chosen) => {
+            marker.closePopup();
+            onSelect(chosen);
+          }),
+        {
+          closeButton: true,
+          offset: [0, -8],
+          maxWidth: 300,
+        }
+      );
+
+      if (canHover) {
+        marker.bindTooltip(() => createClusterTooltipElement(sorted.length, minMonthly, topScore), {
+          direction: "top",
+          offset: [0, -10],
+        });
+        marker.on("popupopen", () => marker.closeTooltip());
+      }
+      marker.addTo(layer);
+    };
+
     if (zoom >= MAP_CONFIG.zoomThresholds.unclusterMinZoom) {
-      for (const item of withCoords) addSingleMarker(item);
+      const byBuilding = new Map<string, ScoredListing[]>();
+      for (const item of withCoords) {
+        const key = `${item.listing.latitude!.toFixed(5)},${item.listing.longitude!.toFixed(5)}`;
+        const arr = byBuilding.get(key) || [];
+        arr.push(item);
+        byBuilding.set(key, arr);
+      }
+      for (const group of byBuilding.values()) {
+        if (group.length === 1) {
+          addSingleMarker(group[0]);
+        } else {
+          addBuildingMarker(group);
+        }
+      }
       return;
     }
 

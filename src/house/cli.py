@@ -118,8 +118,9 @@ def _minutes_since(iso_ts: str | None) -> float | None:
 
 def cmd_poll(config: AppConfig, args: argparse.Namespace) -> int:
     items, by_source = poll_all_sources(config, synthetic=args.synthetic)
+    reconcile = None if args.synthetic else "homeharvest"
     with Database(config.database_path) as db:
-        summary = db.upsert_listings(items)
+        summary = db.upsert_listings(items, reconcile_source=reconcile)
         db.set_bot_state("last_poll_at", datetime.now(timezone.utc).isoformat())
     print("Sources polled:", json.dumps(by_source, indent=2))
     print("Database upsert:", json.dumps(summary, indent=2))
@@ -230,7 +231,8 @@ def cmd_run(config: AppConfig, args: argparse.Namespace) -> int:
             )
             if should_poll:
                 items, by_source = poll_all_sources(cfg, synthetic=args.synthetic)
-                summary = db.upsert_listings(items)
+                reconcile = None if args.synthetic else "homeharvest"
+                summary = db.upsert_listings(items, reconcile_source=reconcile)
                 db.set_bot_state("last_poll_at", datetime.now(timezone.utc).isoformat())
                 print("Polled:", json.dumps(by_source), "| Upsert:", json.dumps(summary))
             else:

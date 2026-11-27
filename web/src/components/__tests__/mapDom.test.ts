@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
+  createBuildingUnitsPopupElement,
   createClusterPinElement,
   createListingPinElement,
   createListingTooltipElement,
@@ -52,5 +53,20 @@ describe("mapDom builders", () => {
     expect(badges).toHaveLength(2);
     expect(badges[0].className).toContain("map-mta-badge-wide");
     expect(badges[0].textContent).toBe("PATH");
+  });
+
+  it("builds a clickable building unit picker popup for multi-unit buildings", () => {
+    const u1 = makeListing({ id: 10, listing: { ...makeListing().listing, unit: "5C" } });
+    const u2 = makeListing({ id: 11, listing: { ...makeListing().listing, unit: "12U" } });
+    const onSelect = vi.fn();
+
+    const el = createBuildingUnitsPopupElement([u1, u2], 11, onSelect);
+    expect(el.textContent).toContain("2 units in building");
+    const buttons = el.querySelectorAll("button");
+    expect(buttons).toHaveLength(2);
+    expect(buttons[1].className).toContain("map-building-unit-row-selected");
+
+    buttons[0].click();
+    expect(onSelect).toHaveBeenCalledWith(u1);
   });
 });
