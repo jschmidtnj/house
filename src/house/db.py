@@ -132,10 +132,21 @@ _STREET_ABBREV = {
 }
 
 
-def make_canonical_key(address: str, unit: str = "", zip_code: str = "") -> str:
+def make_canonical_key(
+    address: str,
+    unit: str = "",
+    zip_code: str = "",
+    *,
+    property_type: str = "",
+    external_id: str = "",
+) -> str:
     """
     Build a stable deduplication key from NYC street address + unit so the same
     apartment appearing on StreetEasy, Redfin, and RentCast merges into one record.
+
+    For unitless condo/coop/condop rows (where the feed omitted the unit number in a
+    multi-unit building), include `external_id` so two different units at the same
+    building address cannot collide into a Franken-listing.
     """
     addr = (address or "").lower().strip()
     # Strip trailing city/state/zip if embedded in address
@@ -151,8 +162,12 @@ def make_canonical_key(address: str, unit: str = "", zip_code: str = "") -> str:
     parts = [norm_addr]
     if norm_unit:
         parts.append(f"#{norm_unit}")
-    elif norm_zip:
-        parts.append(norm_zip)
+    else:
+        if norm_zip:
+            parts.append(norm_zip)
+        ext = (external_id or "").strip()
+        if ext and (property_type or "").lower() in ("condo", "coop", "condop"):
+            parts.append(f"id:{ext}")
     return "|".join(parts)
 
 
@@ -203,7 +218,13 @@ class Database:
         if the new price is lower than the previously stored price.
         """
         now = datetime.now(timezone.utc).isoformat()
-        ckey = make_canonical_key(item.address, item.unit, item.zip_code)
+        ckey = make_canonical_key(
+            item.address,
+            item.unit,
+            item.zip_code,
+            property_type=item.property_type,
+            external_id=item.external_id,
+        )
         if not ckey:
             ckey = f"{item.source}:{item.external_id}"
 
@@ -400,7 +421,13 @@ class Database:
                 continue
             _, is_new, drop_pct = self.upsert_listing(item)
             if reconcile_source and item.source == reconcile_source:
-                ckey = make_canonical_key(item.address, item.unit, item.zip_code)
+                ckey = make_canonical_key(
+                    item.address,
+                    item.unit,
+                    item.zip_code,
+                    property_type=item.property_type,
+                    external_id=item.external_id,
+                )
                 seen_for_reconcile.add(ckey or f"{item.source}:{item.external_id}")
             if is_new:
                 inserted += 1

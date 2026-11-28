@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import math
+import re
 from typing import Any
 
 from house.config import BudgetConfig, HomeHarvestSourceConfig, SearchConfig
@@ -70,6 +71,24 @@ def _extract_monthly_tax(row: dict[str, Any]) -> float | None:
     return None
 
 
+_DESC_UNIT_RE = re.compile(
+    r"\b(?:residence|unit|apt\.?|apartment|suite)\s+#?([A-Za-z0-9]{1,6}(?:-[A-Za-z0-9]{1,4})?)\b",
+    re.IGNORECASE,
+)
+
+
+def _extract_unit_from_description(description: str) -> str:
+    """Fallback unit extractor for listings where the feed omits `unit` (e.g. 'Residence 3910')."""
+    if not description:
+        return ""
+    for m in _DESC_UNIT_RE.finditer(description):
+        token = m.group(1).strip()
+        # Require at least one digit so prose like "residence offers" or "unit features" never matches
+        if any(ch.isdigit() for ch in token):
+            return token
+    return ""
+
+
 def parse_homeharvest_row(row: dict[str, Any]) -> ListingData | None:
     """Convert a single HomeHarvest record dict into a normalized ListingData."""
     price = parse_currency(_clean_val(row.get("list_price")) or _clean_val(row.get("price")))
@@ -105,6 +124,8 @@ def parse_homeharvest_row(row: dict[str, Any]) -> ListingData | None:
     num_units = detect_num_units(ptype, description, _clean_val(row.get("units")))
     if num_units >= 2 and ptype in ("townhouse", "condo"):
         ptype = "multifamily"
+    if not unit and ptype in ("condo", "coop", "condop"):
+        unit = _extract_unit_from_description(description)
 
     hoa_fee = parse_currency(_clean_val(row.get("hoa_fee")))
     monthly_hoa: float | None = None

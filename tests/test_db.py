@@ -183,3 +183,54 @@ def test_reconcile_respects_allowed_zips_and_past_days_window():
             reconcile_zips=set(),
         )
         assert summary_empty["marked_off_market"] == 0
+
+
+def test_unitless_condos_same_building_do_not_collide():
+    from house.sources.homeharvest_source import parse_homeharvest_row
+
+    # 1. Description unit extraction pulls "3910" from "Residence 3910"
+    parsed = parse_homeharvest_row(
+        {
+            "street": "3 Court Sq",
+            "unit": None,
+            "zip_code": "11101",
+            "style": "CONDOS",
+            "list_price": 1_850_000,
+            "beds": 2,
+            "full_baths": 2,
+            "sqft": 972,
+            "property_id": "9078950253",
+            "text": "Perched high above LIC, Residence 3910 is a sunny 2BR condo.",
+        }
+    )
+    assert parsed is not None
+    assert parsed.unit == "3910"
+
+    # 2. Still-unitless condos with different external_ids stay separate rows (no Franken-listing)
+    with Database(":memory:") as db:
+        u1 = ListingData(
+            source="homeharvest",
+            external_id="pid-1",
+            address="3 Court Sq",
+            unit="",
+            zip_code="11101",
+            property_type="condo",
+            price=1_850_000,
+            beds=2.0,
+            baths=2.0,
+        )
+        u2 = ListingData(
+            source="homeharvest",
+            external_id="pid-2",
+            address="3 Court Sq",
+            unit="",
+            zip_code="11101",
+            property_type="condo",
+            price=660_400,
+            beds=1.0,
+            baths=1.0,
+        )
+        summary = db.upsert_listings([u1, u2])
+        assert summary["inserted"] == 2
+        assert summary["price_drops"] == 0
+        assert len(db.get_listings(status="active")) == 2
