@@ -13,11 +13,11 @@ from typing import Any
 MIDTOWN_LAT = 40.7540
 MIDTOWN_LNG = -73.9820
 
-# Lines with direct service into Midtown Manhattan (34th-59th St)
+# Lines with direct service into Midtown Manhattan (34th-59th St / Grand Central)
 _DIRECT_MIDTOWN_LINES = {
     "1", "2", "3", "4", "5", "6", "7",
     "A", "B", "C", "D", "E", "F", "M",
-    "N", "Q", "R", "W", "PATH",
+    "N", "Q", "R", "W", "PATH", "MNR",
 }
 
 
@@ -41,11 +41,11 @@ def _haversine_miles(lat1: float, lng1: float, lat2: float, lng2: float) -> floa
 
 @lru_cache(maxsize=1)
 def load_subway_stations() -> list[dict[str, Any]]:
-    """Load cached MTA subway station coordinates from web/public/data/nyc_subways.json."""
+    """Load cached NYC transit station coordinates (MTA subway, PATH, Metro-North) from nyc_transit.json."""
     candidates = [
-        Path("web/public/data/nyc_subways.json"),
-        Path("web/dist/data/nyc_subways.json"),
-        Path(__file__).resolve().parents[3] / "web" / "public" / "data" / "nyc_subways.json",
+        Path("web/public/data/nyc_transit.json"),
+        Path("web/dist/data/nyc_transit.json"),
+        Path(__file__).resolve().parents[3] / "web" / "public" / "data" / "nyc_transit.json",
     ]
     for path in candidates:
         if path.exists():
@@ -106,8 +106,9 @@ def estimate_midtown_commute(
         has_direct = any(r in _DIRECT_MIDTOWN_LINES for r in routes)
         wait_min = 4.0 if len(routes) >= 2 else 5.0
         transfer_min = 0.0 if has_direct else 6.0
-        # NYC subway averages ~16 mph incl. stops + ~3 min egress in Midtown
-        ride_min = (ride_miles / 16.0) * 60.0 + 3.0
+        # NYC subway averages ~16 mph incl. stops; Metro-North commuter rail averages ~32 mph
+        avg_mph = 32.0 if "MNR" in routes else 16.0
+        ride_min = (ride_miles / avg_mph) * 60.0 + 3.0
         total = walk_min + wait_min + ride_min + transfer_min
 
         if total < best_subway_min:

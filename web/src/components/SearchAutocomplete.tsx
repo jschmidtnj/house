@@ -163,7 +163,7 @@ export function SearchAutocomplete({
       <input
         ref={inputRef}
         type="text"
-        placeholder="Search address, hood, subway, zip... (/)"
+        placeholder="Search address, hood, transit, zip... (/)"
         value={query}
         onFocus={() => setOpen(true)}
         onChange={(e) => {

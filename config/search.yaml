@@ -4,8 +4,20 @@ boroughs:
   - Manhattan
   - Brooklyn
   - Queens
+  - Bronx
   - Jersey City
   - Hoboken
+  - Hastings-on-Hudson
+  - Hastings On Hudson
+  - Dobbs Ferry
+  - Irvington
+  - Ardsley-on-Hudson
+  - Tarrytown
+  - Sleepy Hollow
+  - Ossining
+  - Briarcliff Manor
+  - Croton-on-Hudson
+  - Croton On Hudson
 
 neighborhoods:
   - East Village
@@ -75,6 +87,18 @@ neighborhoods:
   - Journal Square
   - The Heights
   - Hoboken
+  - Riverdale
+  - Hastings-on-Hudson
+  - Hastings On Hudson
+  - Dobbs Ferry
+  - Irvington
+  - Ardsley-on-Hudson
+  - Tarrytown
+  - Sleepy Hollow
+  - Ossining
+  - Briarcliff Manor
+  - Croton-on-Hudson
+  - Croton On Hudson
 
 zip_codes:
   - "07030"
@@ -116,6 +140,13 @@ zip_codes:
   - "10128"
   - "10280"
   - "10282"
+  - "10471"
+  - "10520"
+  - "10522"
+  - "10533"
+  - "10562"
+  - "10591"
+  - "10706"
   - "11201"
   - "11205"
   - "11206"

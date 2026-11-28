@@ -69,8 +69,8 @@ export const MAP_CONFIG = {
   flyToListingMinZoom: 14,
   dataUrls: {
     neighborhoods: "/data/nyc_neighborhoods.geojson?v=2",
-    subwayLines: "/data/nyc_subway_lines.geojson",
-    subways: "/data/nyc_subways.json",
+    transitLines: "/data/nyc_transit_lines.geojson",
+    transitStations: "/data/nyc_transit.json",
   },
   zoomThresholds: {
     showPermanentHoodLabels: 12,
@@ -142,4 +142,5 @@ export const MTA_COLORS: Record<string, { bg: string; fg: string }> = {
   "7": { bg: "#B933AD", fg: "#fff" },
   S: { bg: "#808183", fg: "#fff" },
   PATH: { bg: "#0078C8", fg: "#fff" },
+  MNR: { bg: "#0039A6", fg: "#fff" },
 };

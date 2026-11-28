@@ -315,7 +315,7 @@ export function ListingDrawer({
           <div className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900/50 px-3 py-2 text-xs">
             <div>
               <div className="font-medium text-zinc-200">
-                {item.commute_mode === "walk" ? "🚶 Walk to Midtown" : "🚇 Subway to Midtown"}:{" "}
+                {item.commute_mode === "walk" ? "🚶 Walk to Midtown" : "🚆 Transit to Midtown"}:{" "}
                 <span className="text-zinc-50">~{item.commute_minutes} min</span>
               </div>
               {item.nearest_station && (

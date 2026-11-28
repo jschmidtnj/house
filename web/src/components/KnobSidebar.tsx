@@ -346,7 +346,7 @@ export function KnobSidebar({
             Max Commute (Midtown)
             <InfoTip
               align="left"
-              text="Estimated door-to-door time to Midtown Core (Bryant Park / Grand Central): compares direct walk vs. walking to the best nearby MTA/PATH station + wait + subway ride (+6m if transfer needed)."
+              text="Estimated door-to-door time to Midtown Core (Bryant Park / Grand Central): compares direct walk vs. walking to the best nearby MTA / PATH / Metro-North station + wait + rail ride (+6m if transfer needed)."
             />
           </span>
           <span className="font-medium text-zinc-100">

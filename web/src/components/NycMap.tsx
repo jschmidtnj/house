@@ -96,14 +96,14 @@ export function NycMap({
       })
       .catch(() => {});
 
-    fetch(MAP_CONFIG.dataUrls.subwayLines)
+    fetch(MAP_CONFIG.dataUrls.transitLines)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (d) setSubwayLinesGeo(d);
       })
       .catch(() => {});
 
-    fetch(MAP_CONFIG.dataUrls.subways)
+    fetch(MAP_CONFIG.dataUrls.transitStations)
       .then((r) => (r.ok ? r.json() : []))
       .then((d) => {
         if (Array.isArray(d)) setSubways(d);
@@ -496,7 +496,7 @@ export function NycMap({
               : "border-zinc-800 bg-zinc-950/85 text-zinc-400 hover:text-zinc-200"
           }`}
         >
-          <TrainFront className="h-3 w-3" /> Subways
+          <TrainFront className="h-3 w-3" /> Transit
         </button>
 
         <button
