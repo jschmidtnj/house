@@ -13,8 +13,8 @@ exclude_keywords:
   - "exposed brick"
   - "exposed-brick"
 
-# Optional base URL for Web UI deep links in Discord embeds (e.g. "http://127.0.0.1:8000")
-web_base_url: ""
+# Public base URL for Web UI deep links in Discord embeds
+web_base_url: "https://house.nomnom.wiki"
 
 # Watchlist alerts for Favorites + custom lists (even if above default $7k/mo cap)
 watchlist:

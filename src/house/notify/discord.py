@@ -73,6 +73,7 @@ class DiscordNotifier:
         sent = 0
         min_score = self.config.search.min_score_to_notify
         min_drop = self.config.search.price_drop_notify_pct
+        web_base = (self.config.alerts.web_base_url or "").rstrip("/")
 
         for item in matches:
             if not item.passes_filters or item.score < min_score:
@@ -111,6 +112,11 @@ class DiscordNotifier:
             )
             if c.warnings:
                 description += "\n⚠️ " + " • ".join(c.warnings)
+            house_url = f"{web_base}/?listing={item.listing_id}" if web_base else ""
+            if house_url and l.url:
+                description += f"\n[Open in House UI]({house_url}) • [Original Listing]({l.url})"
+            elif house_url:
+                description += f"\n[Open in House UI]({house_url})"
 
             fee_label = "Maintenance" if l.property_type == "coop" else "Common Chg"
             fields = [
@@ -132,7 +138,7 @@ class DiscordNotifier:
                 description=description,
                 fields=fields,
                 color=COLOR_PRICE_DROP if is_price_drop else COLOR_NEW_MATCH,
-                url=l.url,
+                url=house_url or l.url,
             )
             if ok:
                 self.db.mark_alert_notified(alert_id)
@@ -199,13 +205,16 @@ class DiscordNotifier:
             yr_str = f" | Built {l.year_built}" if l.year_built else ""
             taste_str = f" | Taste Match: **{cand.taste_score:.0f}%**" if cand.taste_score is not None else ""
             lines = [
-                f"**{l.property_type.upper()}** ({l.num_units}u) | {l.beds:g} bd / {l.baths:g} ba | {sqft_str}{yr_str}{taste_str}",
+                f"**{l.property_type.upper()}** ({l.num_units}u) | {l.beds:g} bd / {l.baths:g} ba | {sqft_str}{yr_str} | Score: **{item.score:.1f}/100**{taste_str}",
                 cand.summary_reason,
             ]
             if cand.taste_reasons:
                 lines.append("✨ " + " • ".join(cand.taste_reasons))
-            if web_base:
-                lines.append(f"[Open in House UI]({web_base}/?listing={cand.listing_id})")
+            house_url = f"{web_base}/?listing={cand.listing_id}" if web_base else ""
+            if house_url and l.url:
+                lines.append(f"[Open in House UI]({house_url}) • [Original Listing]({l.url})")
+            elif house_url:
+                lines.append(f"[Open in House UI]({house_url})")
             description = "\n".join(ln for ln in lines if ln)
 
             is_multi = c.rentable_units > 0 and self.config.budget.use_net_rental_for_filter
@@ -237,11 +246,6 @@ class DiscordNotifier:
                     "value": f"${c.estimated_cash_to_close:,.0f} ({c.down_payment_pct:.0f}% down)",
                     "inline": True,
                 },
-                {
-                    "name": "Score",
-                    "value": f"{item.score:.1f}/100",
-                    "inline": True,
-                },
             ]
 
             ok = self.send_embed(
@@ -249,7 +253,7 @@ class DiscordNotifier:
                 description=description,
                 fields=fields,
                 color=color,
-                url=l.url,
+                url=house_url or l.url,
             )
             if ok:
                 self.db.mark_alert_notified(alert_id)
